@@ -42,7 +42,7 @@ const state = {
 
 // ─── DOM Helpers ──────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
-const saveStateKeys = ['recipients', 'subject', 'body', 'sendAll', 'campaignName'];
+const saveStateKeys = ['recipients', 'subject', 'body', 'sendAll', 'campaignName', 'sendInterval'];
 
 // ─── Tab Navigation ───────────────────────────────────────────────────────────
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -63,6 +63,7 @@ function saveState() {
     body:         $('body').value,
     sendAll:      $('sendAllToggle').checked,
     campaignName: $('campaignName').value,
+    sendInterval: $('sendIntervalInput').value,
   });
 }
 
@@ -72,6 +73,7 @@ async function restoreState() {
   if (data.subject)      $('subject').value       = data.subject;
   if (data.body)         $('body').value          = data.body;
   if (data.sendAll)      $('sendAllToggle').checked = data.sendAll;
+  if (data.sendInterval) $('sendIntervalInput').value = data.sendInterval;
   $('campaignName').value = data.campaignName || generateCampaignName();
   updateCharCount();
   onRecipientsChange();
@@ -91,6 +93,7 @@ $('extractNamesCheck').addEventListener('change', () => {
   state.extractNames = $('extractNamesCheck').checked;
   onRecipientsChange();
 });
+$('sendIntervalInput').addEventListener('input', saveState);
 
 function updateCharCount() {
   $('charCount').textContent = $('body').value.length + ' chars';
@@ -430,11 +433,15 @@ $('startBtn').addEventListener('click', async () => {
   setStatus('running', `Starting "${campName}" — ${resolved.length} recipient(s)…`);
 
   try {
+    const rawInterval = parseInt($('sendIntervalInput').value, 10);
+    const intervalMs  = Math.max(1, isNaN(rawInterval) ? 3 : rawInterval) * 1000;
+
     await chrome.tabs.sendMessage(tab.id, {
       type: 'START_MERGE',
       resolved: resolved.map(r => ({ email: r.email, subject: r.subject, body: r.body })),
       autoSend,
       campaignId: state.activeCampaignId,
+      interval: intervalMs,
     });
   } catch (err) {
     lockUI(false);
@@ -481,7 +488,7 @@ function updateProgress(cur, total) {
 }
 function resetProgress() { $('progressBar').style.display = 'none'; $('progressFill').style.width = '0%'; }
 function lockUI(locked) {
-  [$('startBtn'), $('recipients'), $('subject'), $('body'), $('sendAllToggle')].forEach(el => el.disabled = locked);
+  [$('startBtn'), $('recipients'), $('subject'), $('body'), $('sendAllToggle'), $('sendIntervalInput')].forEach(el => el.disabled = locked);
   $('startBtn').textContent = locked ? '⏳ Running…' : '🚀 Start Mail Merge';
 }
 

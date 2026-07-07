@@ -143,7 +143,7 @@ async function composeOne(selectors, email, subject, body, autoSend) {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type !== "START_MERGE") return;
 
-  const { resolved, autoSend, campaignId } = message;
+  const { resolved, autoSend, campaignId, interval } = message;
   const mergeStart = Date.now();
 
   (async () => {
@@ -153,7 +153,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return;
     }
 
-    const DELAY_BETWEEN = 1500;
+    const DELAY_BETWEEN = interval || 1500;
 
     for (let i = 0; i < resolved.length; i++) {
       const { email, subject, body } = resolved[i];
