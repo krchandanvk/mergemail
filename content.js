@@ -74,7 +74,7 @@ function nativeInputValue(element, value) {
 function setBodyContent(element, text) {
   element.focus();
   document.execCommand("selectAll", false, null);
-  document.execCommand("insertText", false, text);
+  document.execCommand("insertHTML", false, text);
   element.dispatchEvent(new InputEvent("input", { bubbles: true }));
 }
 

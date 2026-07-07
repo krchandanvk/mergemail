@@ -100,7 +100,7 @@ export class RecipientValidator {
    */
   static _extractVars(template) {
     const vars = new Set();
-    const rx   = /\{\{(\w+)\}\}/g;
+    const rx   = /\{\{\s*(\w+)(?:\s*\|.*?)?\}\}/g;
     let m;
     while ((m = rx.exec(template || '')) !== null) vars.add(m[1].toLowerCase());
     return [...vars];

@@ -41,11 +41,11 @@
       font-family: var(--font);
       background: var(--bg);
       color: var(--text);
-      width: 460px;
-      min-height: 520px;
+      width: 780px;
+      height: 580px;
       display: flex;
       flex-direction: column;
-      overflow-x: hidden;
+      overflow: hidden;
     }
 
     /* ── Scrollbar ── */
@@ -240,6 +240,136 @@
       text-decoration: line-through; opacity: 0.5;
     }
     .chips-empty { font-size: 10.5px; color: var(--text-dim); }
+
+    /* ── Split Grid Layout ── */
+    .compose-grid {
+      display: flex;
+      gap: 16px;
+      height: calc(580px - 84px);
+      overflow: hidden;
+      padding: 10px 14px;
+    }
+    .compose-left {
+      flex: 1.2;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow-y: auto;
+      padding-right: 5px;
+    }
+    .compose-right {
+      flex: 0.8;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow-y: auto;
+      border-left: 1px solid var(--border);
+      padding-left: 14px;
+    }
+
+    /* ── ContentEditable Rich-Text Editor ── */
+    #bodyEditor {
+      width: 100%;
+      min-height: 120px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 12.5px;
+      padding: 8px 11px;
+      outline: none;
+      overflow-y: auto;
+      line-height: 1.5;
+    }
+    #bodyEditor:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    #bodyEditor[placeholder]:empty:before {
+      content: attr(placeholder);
+      color: var(--text-dim);
+    }
+
+    /* Editor Toolbar */
+    .editor-toolbar {
+      display: flex;
+      gap: 3px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 4px;
+      align-items: center;
+    }
+    .editor-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: var(--r-xs);
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+    .editor-btn:hover {
+      background: var(--surface-3);
+      color: var(--text);
+    }
+    .editor-btn.active {
+      background: var(--accent-glow);
+      color: var(--accent-2);
+    }
+
+    /* Device Switcher */
+    .device-switcher {
+      display: flex;
+      gap: 2px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 3px;
+      align-self: flex-start;
+      margin-bottom: 2px;
+    }
+    .device-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: var(--r-xs);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .device-btn:hover {
+      color: var(--text);
+    }
+    .device-btn.active {
+      background: var(--surface-3);
+      color: var(--accent-2);
+    }
+
+    /* Custom Mobile Frame */
+    .preview-frame-wrap {
+      transition: all 0.25s ease-in-out;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .preview-frame-wrap.mobile {
+      max-width: 250px;
+      align-self: center;
+      border: 6px solid var(--border);
+      border-radius: 20px;
+      padding: 10px;
+      background: var(--bg);
+    }
+    .preview-frame-wrap.mobile .preview-value {
+      max-height: 120px;
+    }
 
     /* ═══════════════════════════════════════════════════════════
        SUBJECT / BODY
@@ -567,126 +697,151 @@
 
 <!-- ══════════════════════ COMPOSE ══════════════════════ -->
 <div class="tab-panel active" id="panel-compose" role="tabpanel">
-  <div class="form-wrap">
+  <div class="compose-grid">
 
-    <!-- Campaign Name -->
-    <div class="campaign-row">
-      <span class="campaign-icon">📁</span>
-      <input class="campaign-input" type="text" id="campaignName" placeholder="Campaign name (auto-filled)" autocomplete="off" />
-    </div>
-
-    <!-- Recipients / CSV Source -->
-    <div class="field-group">
-      <div class="recipients-header">
-        <label for="recipients"><span class="label-icon">👥</span> Recipients <span class="required">*</span></label>
-        <span id="recipientBadge"></span>
+    <!-- Left Column (Inputs, Editor) -->
+    <div class="compose-left">
+      <!-- Campaign Name -->
+      <div class="campaign-row">
+        <span class="campaign-icon">📁</span>
+        <input class="campaign-input" type="text" id="campaignName" placeholder="Campaign name (auto-filled)" autocomplete="off" />
       </div>
 
-      <!-- CSV source summary (shown when CSV is loaded) -->
-      <div id="csvSourceBox">
-        <div class="csv-source-top">
-          <span class="csv-source-title" id="csvSourceTitle">📋 0 recipients from CSV</span>
-          <button class="danger-btn" id="clearCsvBtn" type="button">✕ Clear</button>
+      <!-- Recipients / CSV Source -->
+      <div class="field-group">
+        <div class="recipients-header">
+          <label for="recipients"><span class="label-icon">👥</span> Recipients <span class="required">*</span></label>
+          <span id="recipientBadge"></span>
         </div>
-        <div class="csv-source-meta" id="csvSourceMeta"></div>
-        <div class="csv-field-chips" id="csvFieldChips"></div>
-      </div>
 
-      <!-- Manual email input (shown in email-only mode) -->
-      <textarea id="recipients"
-        placeholder="john@gmail.com&#10;alice@example.com&#10;bob@company.com"
-        spellcheck="false" autocomplete="off"></textarea>
+        <!-- CSV source summary (shown when CSV is loaded) -->
+        <div id="csvSourceBox">
+          <div class="csv-source-top">
+            <span class="csv-source-title" id="csvSourceTitle">📋 0 recipients from CSV</span>
+            <button class="danger-btn" id="clearCsvBtn" type="button">✕ Clear</button>
+          </div>
+          <div class="csv-source-meta" id="csvSourceMeta"></div>
+          <div class="csv-field-chips" id="csvFieldChips"></div>
+        </div>
 
-      <!-- Email-only mode banner -->
-      <div id="emailModeBanner">
-        <div class="mode-banner-title">ℹ️ Email-only mode — limited personalization</div>
-        <div class="mode-banner-body">Only <code style="color:var(--accent-2);font-size:10px">{{email}}</code> is reliably available. Variables like <code style="color:var(--red);font-size:10px">{{name}}</code>, <code style="color:var(--red);font-size:10px">{{company}}</code> require a CSV upload.</div>
-        <div class="extract-row">
-          <input type="checkbox" id="extractNamesCheck" checked />
-          <label class="extract-label" for="extractNamesCheck">
-            Auto-extract name from email address &nbsp;<span class="extract-badge">Estimated</span>
-          </label>
+        <!-- Manual email input (shown in email-only mode) -->
+        <textarea id="recipients"
+          placeholder="john@gmail.com&#10;alice@example.com&#10;bob@company.com"
+          spellcheck="false" autocomplete="off"></textarea>
+
+        <!-- Email-only mode banner -->
+        <div id="emailModeBanner">
+          <div class="mode-banner-title">ℹ️ Email-only mode — limited personalization</div>
+          <div class="mode-banner-body">Only <code style="color:var(--accent-2);font-size:10px">{{email}}</code> is reliably available. Variables like <code style="color:var(--red);font-size:10px">{{name}}</code> require a CSV.</div>
+          <div class="extract-row">
+            <input type="checkbox" id="extractNamesCheck" checked />
+            <label class="extract-label" for="extractNamesCheck">
+              Auto-extract name from email address &nbsp;<span class="extract-badge">Estimated</span>
+            </label>
+          </div>
         </div>
       </div>
+
+      <!-- Subject -->
+      <div class="field-group">
+        <label for="subject"><span class="label-icon">📌</span> Subject <span class="required">*</span></label>
+        <input type="text" id="subject" placeholder="Hi {{name}}, a quick note…" autocomplete="off" spellcheck="false" />
+      </div>
+
+      <!-- Body with dynamic chips & WYSIWYG editor -->
+      <div class="field-group">
+        <label for="bodyEditor"><span class="label-icon">📝</span> Message Body <span class="required">*</span></label>
+        <div class="chips-wrap" id="chipsWrap">
+          <span class="chips-empty">Upload a CSV to generate merge fields</span>
+        </div>
+        
+        <!-- WYSIWYG Editor Toolbar -->
+        <div class="editor-toolbar">
+          <button class="editor-btn" type="button" data-cmd="bold" title="Bold"><b>B</b></button>
+          <button class="editor-btn" type="button" data-cmd="italic" title="Italic"><i>I</i></button>
+          <button class="editor-btn" type="button" data-cmd="underline" title="Underline"><u>U</u></button>
+          <button class="editor-btn" type="button" data-cmd="insertUnorderedList" title="Bullet List">• List</button>
+          <button class="editor-btn" type="button" id="editorLinkBtn" title="Insert Link">🔗 Link</button>
+        </div>
+
+        <!-- contenteditable rich editor -->
+        <div id="bodyEditor" contenteditable="true"
+          placeholder="Hi {{name}},&#10;&#10;I wanted to reach out regarding your role as {{role}} at {{company}}.&#10;&#10;Best regards"></div>
+          
+        <div class="field-footer">
+          <span id="charCount">0 chars</span>
+        </div>
+      </div>
+
+      <!-- Send All Toggle -->
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">⚡ Send All Automatically</div>
+          <div class="toggle-sub">⚠️ Emails sent immediately — cannot be undone.</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="sendAllToggle" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- Interval / Delay Control -->
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">⏱️ Delay Between Emails</div>
+          <div class="toggle-sub">Throttle interval to prevent spam/blocking.</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <input type="number" id="sendIntervalInput" min="1" max="60" value="3" style="width: 50px; padding: 4px 6px; text-align: center; font-size: 12px; background: var(--surface-3); border: 1px solid var(--border-2); border-radius: 4px; color: var(--text); outline: none;" />
+          <span style="font-size: 11px; color: var(--text-muted)">sec</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div id="progressBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div id="progressFill"></div>
+      </div>
+
+      <div id="statusBox" class="status-box idle" role="status" aria-live="polite">
+        <span id="statusIcon">ℹ️</span>
+        <span id="statusText">Ready. Upload a CSV or enter emails, then fill in the template.</span>
+      </div>
+
+      <button id="startBtn" type="button">🚀 Start Mail Merge</button>
     </div>
 
-    <!-- Subject -->
-    <div class="field-group">
-      <label for="subject"><span class="label-icon">📌</span> Subject <span class="required">*</span></label>
-      <input type="text" id="subject" placeholder="Hi {{name}}, a quick note…" autocomplete="off" spellcheck="false" />
+    <!-- Right Column (Device-Aware Live Preview & Validation Panel) -->
+    <div class="compose-right">
+      <!-- Device Switcher -->
+      <div class="device-switcher">
+        <button class="device-btn active" id="deviceDesktopBtn" type="button" data-device="desktop">🖥️ Desktop</button>
+        <button class="device-btn" id="deviceMobileBtn" type="button" data-device="mobile">📱 Mobile</button>
+      </div>
+
+      <!-- Preview Frame -->
+      <div class="preview-frame-wrap" id="previewFrameWrap">
+        <!-- Preview Panel -->
+        <div id="previewPanel" style="display: flex;">
+          <div class="preview-toolbar">
+            <span class="preview-label-txt">Preview as:</span>
+            <select id="previewSelect"><option value="-1">— select recipient —</option></select>
+            <span class="preview-counter" id="previewCounter"></span>
+          </div>
+          <div>
+            <div class="preview-field-label">Subject</div>
+            <div class="preview-value" id="previewSubjectEl"></div>
+          </div>
+          <div>
+            <div class="preview-field-label">Body</div>
+            <div class="preview-value" id="previewBodyEl" style="max-height: 190px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Validation Panel -->
+      <div id="validationPanel"></div>
     </div>
-
-    <!-- Body with dynamic chips -->
-    <div class="field-group">
-      <label for="body"><span class="label-icon">📝</span> Message Body <span class="required">*</span></label>
-      <div class="chips-wrap" id="chipsWrap">
-        <span class="chips-empty">Upload a CSV to generate merge fields</span>
-      </div>
-      <textarea id="body"
-        placeholder="Hi {{name}},&#10;&#10;I wanted to reach out regarding your role as {{role}} at {{company}}.&#10;&#10;Best regards"
-        spellcheck="true"></textarea>
-      <div class="field-footer">
-        <span id="charCount">0 chars</span>
-        <button class="sm-btn" id="previewBtn" type="button">👁 Preview</button>
-      </div>
-    </div>
-
-    <!-- Preview Panel -->
-    <div id="previewPanel">
-      <div class="preview-toolbar">
-        <span class="preview-label-txt">Preview as:</span>
-        <select id="previewSelect"><option value="-1">— select recipient —</option></select>
-        <span class="preview-counter" id="previewCounter"></span>
-      </div>
-      <div>
-        <div class="preview-field-label">Subject</div>
-        <div class="preview-value" id="previewSubjectEl"></div>
-      </div>
-      <div>
-        <div class="preview-field-label">Body</div>
-        <div class="preview-value" id="previewBodyEl"></div>
-      </div>
-    </div>
-
-    <!-- Validation Panel -->
-    <div id="validationPanel"></div>
-
-    <!-- Send All Toggle -->
-    <div class="toggle-row">
-      <div>
-        <div class="toggle-label">⚡ Send All Automatically</div>
-        <div class="toggle-sub">⚠️ Emails sent immediately — cannot be undone.</div>
-      </div>
-      <label class="toggle">
-        <input type="checkbox" id="sendAllToggle" />
-        <span class="slider"></span>
-      </label>
-    </div>
-
-    <!-- Interval / Delay Control -->
-    <div class="toggle-row">
-      <div>
-        <div class="toggle-label">⏱️ Delay Between Emails</div>
-        <div class="toggle-sub">Throttle interval to prevent spam/blocking.</div>
-      </div>
-      <div style="display: flex; align-items: center; gap: 6px;">
-        <input type="number" id="sendIntervalInput" min="1" max="60" value="3" style="width: 50px; padding: 4px 6px; text-align: center; font-size: 12px; background: var(--surface-3); border: 1px solid var(--border-2); border-radius: 4px; color: var(--text); outline: none;" />
-        <span style="font-size: 11px; color: var(--text-muted)">sec</span>
-      </div>
-    </div>
-
-    <div class="divider"></div>
-
-    <div id="progressBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-      <div id="progressFill"></div>
-    </div>
-
-    <div id="statusBox" class="status-box idle" role="status" aria-live="polite">
-      <span id="statusIcon">ℹ️</span>
-      <span id="statusText">Ready. Upload a CSV or enter emails, then fill in the template.</span>
-    </div>
-
-    <button id="startBtn" type="button">🚀 Start Mail Merge</button>
 
   </div>
 </div>

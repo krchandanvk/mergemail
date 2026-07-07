@@ -60,7 +60,7 @@ function saveState() {
   chrome.storage.local.set({
     recipients:   $('recipients').value,
     subject:      $('subject').value,
-    body:         $('body').value,
+    body:         $('bodyEditor').innerHTML,
     sendAll:      $('sendAllToggle').checked,
     campaignName: $('campaignName').value,
     sendInterval: $('sendIntervalInput').value,
@@ -71,7 +71,7 @@ async function restoreState() {
   const data = await chrome.storage.local.get(saveStateKeys);
   if (data.recipients)   $('recipients').value   = data.recipients;
   if (data.subject)      $('subject').value       = data.subject;
-  if (data.body)         $('body').value          = data.body;
+  if (data.body)         $('bodyEditor').innerHTML = data.body;
   if (data.sendAll)      $('sendAllToggle').checked = data.sendAll;
   if (data.sendInterval) $('sendIntervalInput').value = data.sendInterval;
   $('campaignName').value = data.campaignName || generateCampaignName();
@@ -95,8 +95,55 @@ $('extractNamesCheck').addEventListener('change', () => {
 });
 $('sendIntervalInput').addEventListener('input', saveState);
 
+// ─── WYSIWYG Editor Actions ──────────────────────────────────────────────────
+document.querySelectorAll('.editor-btn[data-cmd]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const cmd = btn.dataset.cmd;
+    document.execCommand(cmd, false, null);
+    $('bodyEditor').focus();
+    saveState();
+    updateCharCount();
+    runLiveValidation();
+    refreshPreview();
+  });
+});
+
+$('editorLinkBtn').addEventListener('click', () => {
+  const url = prompt('Enter URL:');
+  if (url) {
+    document.execCommand('createLink', false, url);
+  }
+  $('bodyEditor').focus();
+  saveState();
+  updateCharCount();
+  runLiveValidation();
+  refreshPreview();
+});
+
+$('bodyEditor').addEventListener('input', () => {
+  saveState();
+  updateCharCount();
+  runLiveValidation();
+  refreshPreview();
+});
+
+// ─── Device Switcher Actions ─────────────────────────────────────────────────
+document.querySelectorAll('.device-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.device-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    
+    const wrap = $('previewFrameWrap');
+    if (btn.dataset.device === 'mobile') {
+      wrap.classList.add('mobile');
+    } else {
+      wrap.classList.remove('mobile');
+    }
+  });
+});
+
 function updateCharCount() {
-  $('charCount').textContent = $('body').value.length + ' chars';
+  $('charCount').textContent = $('bodyEditor').innerText.length + ' chars';
 }
 
 // ─── Recipient Mode Management ────────────────────────────────────────────────
@@ -226,24 +273,29 @@ function renderChips() {
   });
 }
 
-function insertAtCursor(textarea, text) {
-  const s = textarea.selectionStart;
-  const e = textarea.selectionEnd;
-  textarea.value = textarea.value.slice(0, s) + text + textarea.value.slice(e);
-  textarea.selectionStart = textarea.selectionEnd = s + text.length;
-  textarea.focus();
+function insertAtCursor(editor, text) {
+  editor.focus();
+  const sel = window.getSelection();
+  if (sel && sel.getRangeAt && sel.rangeCount) {
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+    const node = document.createTextNode(text);
+    range.insertNode(node);
+    
+    // Move caret after inserted text
+    range.setStartAfter(node);
+    range.setEndAfter(node);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  } else {
+    editor.innerHTML += text;
+  }
   saveState();
   runLiveValidation();
   refreshPreview();
 }
 
-// ─── Preview Panel ────────────────────────────────────────────────────────────
-$('previewBtn').addEventListener('click', () => {
-  const panel = $('previewPanel');
-  const isOpen = panel.classList.toggle('visible');
-  $('previewBtn').textContent = isOpen ? '✕ Close' : '👁 Preview';
-  if (isOpen) { rebuildPreviewDropdown(); refreshPreview(); }
-});
+// Preview Panel click listener removed as it is permanently visible
 
 function rebuildPreviewDropdown() {
   const sel   = $('previewSelect');
@@ -266,7 +318,6 @@ function rebuildPreviewDropdown() {
 $('previewSelect').addEventListener('change', refreshPreview);
 
 function refreshPreview() {
-  if (!$('previewPanel').classList.contains('visible')) return;
   const idx  = parseInt($('previewSelect').value, 10);
   const row  = (idx >= 0 && state.recipientRows[idx]) ? state.recipientRows[idx] : null;
 
@@ -276,7 +327,7 @@ function refreshPreview() {
     return;
   }
 
-  const prev = EmailGenerator.previewOne(row, $('subject').value, $('body').value);
+  const prev = EmailGenerator.previewOne(row, $('subject').value, $('bodyEditor').innerHTML);
   $('previewSubjectEl').innerHTML = prev.subjectHtml;
   $('previewBodyEl').innerHTML    = prev.bodyHtml;
 }
@@ -285,7 +336,7 @@ function refreshPreview() {
 function runLiveValidation() {
   const panel       = $('validationPanel');
   const subject     = $('subject').value;
-  const body        = $('body').value;
+  const body        = $('bodyEditor').innerHTML;
   const availKeys   = state.mergeFields.map(f => f.key);
   const { errors, warnings } = RecipientValidator.validate(
     state.recipientRows, subject, body, availKeys
@@ -357,15 +408,16 @@ $('clearCsvBtn').addEventListener('click', clearCsv);
 // ══════════════════════════════════════════════════════════════════
 $('startBtn').addEventListener('click', async () => {
   const subject  = $('subject').value.trim();
-  const body     = $('body').value.trim();
+  const bodyText = $('bodyEditor').innerText.trim();
+  const bodyHtml = $('bodyEditor').innerHTML;
   const autoSend = $('sendAllToggle').checked;
 
-  if (!subject) { setStatus('error', 'Subject cannot be empty.'); return; }
-  if (!body)    { setStatus('error', 'Message body cannot be empty.'); return; }
+  if (!subject)  { setStatus('error', 'Subject cannot be empty.'); return; }
+  if (!bodyText) { setStatus('error', 'Message body cannot be empty.'); return; }
 
   // Final validation (full — including email checks)
   const availKeys  = state.mergeFields.map(f => f.key);
-  const validation = RecipientValidator.validate(state.recipientRows, subject, body, availKeys);
+  const validation = RecipientValidator.validate(state.recipientRows, subject, bodyHtml, availKeys);
 
   if (!validation.valid) {
     $('validationPanel').innerHTML = validation.errors.map(e =>
@@ -413,7 +465,7 @@ $('startBtn').addEventListener('click', async () => {
   } catch (_) {}
 
   // Generate resolved emails (one per recipient)
-  const resolved = EmailGenerator.generate(state.recipientRows, subject, body);
+  const resolved = EmailGenerator.generate(state.recipientRows, subject, bodyHtml);
 
   if (!resolved.length) { setStatus('error', 'No valid emails to send.'); return; }
 
@@ -422,7 +474,7 @@ $('startBtn').addEventListener('click', async () => {
   const campRes  = await bg('SAVE_CAMPAIGN', {
     campaign: {
       name: campName, provider, mode: autoSend ? 'send' : 'draft',
-      subject, body, totalCount: resolved.length,
+      subject, body: bodyHtml, totalCount: resolved.length,
     }
   });
   state.activeCampaignId = campRes?.id || null;
@@ -488,7 +540,8 @@ function updateProgress(cur, total) {
 }
 function resetProgress() { $('progressBar').style.display = 'none'; $('progressFill').style.width = '0%'; }
 function lockUI(locked) {
-  [$('startBtn'), $('recipients'), $('subject'), $('body'), $('sendAllToggle'), $('sendIntervalInput')].forEach(el => el.disabled = locked);
+  $('bodyEditor').contentEditable = locked ? 'false' : 'true';
+  [$('startBtn'), $('recipients'), $('subject'), $('sendAllToggle'), $('sendIntervalInput')].forEach(el => el.disabled = locked);
   $('startBtn').textContent = locked ? '⏳ Running…' : '🚀 Start Mail Merge';
 }
 

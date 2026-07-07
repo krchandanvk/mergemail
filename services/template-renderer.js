@@ -17,9 +17,24 @@ export class TemplateRenderer {
    */
   static resolve(template, data) {
     const lookup = TemplateRenderer._buildLookup(data);
-    return (template || '').replace(/\{\{(\w+)\}\}/g, (match, key) => {
-      const val = lookup[key.toLowerCase()];
-      return (val !== undefined && val.trim() !== '') ? val : match;
+    return (template || '').replace(/\{\{([^}]+)\}\}/g, (match, expression) => {
+      const parts = expression.split('|');
+      const key = parts[0].trim().toLowerCase();
+      const val = lookup[key];
+      
+      if (val !== undefined && val.trim() !== '') {
+        return val;
+      }
+      
+      if (parts.length > 1) {
+        const fallbackPart = parts[1].trim();
+        const m = fallbackPart.match(/(?:default|fallback)\s*[:=]\s*['"]([^'"]*)['"]/i);
+        if (m) {
+          return m[1];
+        }
+      }
+      
+      return match;
     });
   }
 
@@ -32,7 +47,7 @@ export class TemplateRenderer {
    */
   static extractVars(template) {
     const vars = new Set();
-    const rx   = /\{\{(\w+)\}\}/g;
+    const rx   = /\{\{\s*(\w+)(?:\s*\|.*?)?\}\}/g;
     let m;
     while ((m = rx.exec(template || '')) !== null) {
       vars.add(m[1].toLowerCase());
@@ -43,6 +58,7 @@ export class TemplateRenderer {
   /**
    * Render a template for preview display as HTML.
    * - Resolved values: wrapped in <span class="var-resolved">
+   * - Fallback values: wrapped in <span class="var-resolved fallback">
    * - Unresolved vars:  wrapped in <span class="var-unresolved">
    * - Newlines converted to <br>
    *
@@ -55,12 +71,24 @@ export class TemplateRenderer {
 
     return TemplateRenderer._escHtml(template || '')
       .replace(/\n/g, '<br>')
-      .replace(/\{\{(\w+)\}\}/g, (match, key) => {
-        const val = lookup[key.toLowerCase()];
+      .replace(/\{\{([^}]+)\}\}/g, (match, expression) => {
+        const parts = expression.split('|');
+        const key = parts[0].trim().toLowerCase();
+        const val = lookup[key];
+        
         if (val !== undefined && val.trim() !== '') {
           return `<span class="var-resolved">${TemplateRenderer._escHtml(val)}</span>`;
         }
-        return `<span class="var-unresolved">{{${key}}}</span>`;
+        
+        if (parts.length > 1) {
+          const fallbackPart = parts[1].trim();
+          const m = fallbackPart.match(/(?:default|fallback)\s*[:=]\s*['"]([^'"]*)['"]/i);
+          if (m) {
+            return `<span class="var-resolved" style="border-color:var(--amber);color:#fde68a;background:var(--amber-bg)">${TemplateRenderer._escHtml(m[1])}</span>`;
+          }
+        }
+        
+        return `<span class="var-unresolved">{{${parts[0].trim()}}}</span>`;
       });
   }
 
@@ -73,7 +101,7 @@ export class TemplateRenderer {
    */
   static highlightVars(template) {
     return TemplateRenderer._escHtml(template || '')
-      .replace(/\{\{(\w+)\}\}/g,
+      .replace(/\{\{\s*(\w+)(?:\s*\|.*?)?\}\}/g,
         '<span class="var-chip">{{$1}}</span>');
   }
 
