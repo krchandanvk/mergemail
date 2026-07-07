@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mail Merger — Reports & Analytics</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #090910;
+      --surface:    #11111a;
+      --surface-2:  #18182a;
+      --surface-3:  #20203a;
+      --border:     #282840;
+      --border-2:   #32325a;
+      --accent:     #7c5cfc;
+      --accent-2:   #c084fc;
+      --accent-glow:rgba(124,92,252,0.2);
+      --text:       #e4e4f0;
+      --text-muted: #6a6a92;
+      --text-dim:   #404060;
+      --green:      #22c55e;
+      --green-bg:   rgba(34,197,94,0.1);
+      --red:        #f43f5e;
+      --red-bg:     rgba(244,63,94,0.1);
+      --amber:      #f59e0b;
+      --amber-bg:   rgba(245,158,11,0.1);
+      --blue:       #60a5fa;
+      --blue-bg:    rgba(96,165,250,0.1);
+      --r:          12px;
+      --r-sm:       8px;
+      --font:       'Inter', system-ui, sans-serif;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+
+    /* ── Top Nav ── */
+    .topnav {
+      background: linear-gradient(135deg, #0e0e22 0%, #121230 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      height: 58px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-logo {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      box-shadow: 0 2px 10px var(--accent-glow);
+      flex-shrink: 0;
+    }
+    .nav-title {
+      font-size: 15px; font-weight: 700; letter-spacing: -0.2px;
+      background: linear-gradient(90deg, #fff 30%, var(--accent-2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .nav-subtitle { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+    .nav-spacer { flex: 1; }
+    .nav-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 14px; border-radius: var(--r-sm);
+      border: 1px solid var(--border-2); background: var(--surface-2);
+      color: var(--text); font-family: var(--font); font-size: 12px;
+      font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .nav-btn:hover { background: var(--surface-3); border-color: var(--accent); color: var(--accent-2); }
+    .nav-btn.danger:hover { border-color: var(--red); color: var(--red); }
+
+    /* ── Layout ── */
+    .main { max-width: 1200px; margin: 0 auto; padding: 28px 24px 48px; }
+
+    /* ── Section headers ── */
+    .section-title {
+      font-size: 13px; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.8px;
+      margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+    }
+    .section-title::after {
+      content: ""; flex: 1; height: 1px; background: var(--border);
+    }
+
+    /* ── Stat Cards ── */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 18px 20px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s, transform 0.15s;
+    }
+    .stat-card:hover { border-color: var(--border-2); transform: translateY(-1px); }
+    .stat-card::before {
+      content: ""; position: absolute; top: 0; left: 0; right: 0;
+      height: 2px;
+    }
+    .stat-card.total::before   { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+    .stat-card.success::before { background: linear-gradient(90deg, var(--green), #86efac); }
+    .stat-card.failed::before  { background: linear-gradient(90deg, var(--red),  #fda4af); }
+    .stat-card.rate::before    { background: linear-gradient(90deg, var(--amber), #fde68a); }
+    .stat-card.time::before    { background: linear-gradient(90deg, var(--blue),  #bfdbfe); }
+
+    .stat-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+    .stat-value { font-size: 32px; font-weight: 800; letter-spacing: -1px; line-height: 1; }
+    .stat-value.green  { color: var(--green); }
+    .stat-value.red    { color: var(--red); }
+    .stat-value.amber  { color: var(--amber); }
+    .stat-value.blue   { color: var(--blue); }
+    .stat-value.purple { background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .stat-sub { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
+
+    /* ── Charts Row ── */
+    .charts-row {
+      display: grid;
+      grid-template-columns: 260px 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    @media (max-width: 900px) { .charts-row { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 600px) { .charts-row { grid-template-columns: 1fr; } }
+
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 18px 20px;
+    }
+    .chart-title {
+      font-size: 12px; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      margin-bottom: 14px;
+    }
+    canvas { display: block; }
+
+    /* Donut legend */
+    .donut-wrap { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+    .donut-legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+    .donut-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── Filters Row ── */
+    .filters-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 14px; flex-wrap: wrap;
+    }
+    .filter-input, .filter-select {
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--r-sm); color: var(--text);
+      font-family: var(--font); font-size: 12.5px;
+      padding: 7px 12px; outline: none;
+      transition: border-color 0.2s;
+    }
+    .filter-input:focus, .filter-select:focus { border-color: var(--accent); }
+    .filter-input { min-width: 220px; }
+    .filter-select { cursor: pointer; }
+    .filter-spacer { flex: 1; }
+    .export-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 14px; border-radius: var(--r-sm);
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border: none; color: #fff; font-family: var(--font);
+      font-size: 12px; font-weight: 700; cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .export-btn:hover { opacity: 0.85; }
+
+    /* ── Campaign Table ── */
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      background: var(--surface-2);
+      padding: 11px 16px;
+      text-align: left;
+      font-size: 10.5px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    thead th:hover { color: var(--text); }
+    thead th .sort-icon { margin-left: 4px; opacity: 0.4; font-size: 10px; }
+    thead th.sorted .sort-icon { opacity: 1; color: var(--accent-2); }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface-2); }
+    tbody tr.expanded { background: var(--surface-2); }
+    tbody td {
+      padding: 11px 16px;
+      font-size: 12.5px;
+      vertical-align: middle;
+    }
+
+    /* Status pill */
+    .pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 20px;
+      font-size: 10.5px; font-weight: 700; letter-spacing: 0.3px;
+    }
+    .pill.completed { background: var(--green-bg);  color: var(--green); border: 1px solid rgba(34,197,94,0.25); }
+    .pill.partial   { background: var(--amber-bg);  color: var(--amber); border: 1px solid rgba(245,158,11,0.25); }
+    .pill.failed    { background: var(--red-bg);    color: var(--red);   border: 1px solid rgba(244,63,94,0.25); }
+    .pill.running   { background: var(--blue-bg);   color: var(--blue);  border: 1px solid rgba(96,165,250,0.25); }
+    .pill.success-r { background: var(--green-bg);  color: var(--green); border: 1px solid rgba(34,197,94,0.25); }
+    .pill.failed-r  { background: var(--red-bg);    color: var(--red);   border: 1px solid rgba(244,63,94,0.25); }
+
+    /* Progress micro-bar */
+    .mini-bar-wrap { display: flex; align-items: center; gap: 8px; }
+    .mini-bar {
+      flex: 1; height: 5px; background: var(--surface-3);
+      border-radius: 99px; overflow: hidden; min-width: 60px;
+    }
+    .mini-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--green), #86efac);
+      border-radius: 99px;
+    }
+    .mini-pct { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+
+    /* Provider badge */
+    .provider-badge {
+      font-size: 10px; font-weight: 700; padding: 2px 7px;
+      border-radius: 4px; background: var(--surface-3);
+      border: 1px solid var(--border-2); color: var(--text-muted);
+    }
+
+    /* ── Expanded recipient detail row ── */
+    .detail-row { display: none; }
+    .detail-row.open { display: table-row; }
+    .detail-cell {
+      padding: 0 0 0 0;
+      background: var(--surface-3);
+      border-bottom: 1px solid var(--border);
+    }
+    .detail-inner { padding: 14px 20px; }
+    .detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .detail-title { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+    .recipient-table { width: 100%; border-collapse: collapse; }
+    .recipient-table th {
+      font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.4px;
+      color: var(--text-dim); font-weight: 700; padding: 5px 10px;
+      text-align: left; border-bottom: 1px solid var(--border);
+    }
+    .recipient-table td {
+      font-size: 11.5px; padding: 6px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .recipient-table tr:last-child td { border-bottom: none; }
+    .recipient-table .err-msg { color: var(--red); font-size: 10.5px; }
+
+    /* ── Empty State ── */
+    .empty-state {
+      text-align: center;
+      padding: 64px 24px;
+    }
+    .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; }
+    .empty-title { font-size: 18px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; }
+    .empty-sub   { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: var(--surface-3); border: 1px solid var(--border-2);
+      border-radius: var(--r-sm); padding: 12px 18px;
+      font-size: 13px; color: var(--text);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+      display: none; animation: slideUp 0.25s ease;
+      z-index: 999;
+    }
+    .toast.visible { display: block; }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 700px) {
+      .topnav { padding: 0 16px; }
+      .main    { padding: 16px 12px 40px; }
+      .stat-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="topnav">
+  <div class="nav-logo">✉️</div>
+  <div>
+    <div class="nav-title">Universal Mail Merger</div>
+    <div class="nav-subtitle">Reports &amp; Analytics</div>
+  </div>
+  <div class="nav-spacer"></div>
+  <button class="nav-btn" id="exportAllBtn">⬇ Export All CSV</button>
+  <button class="nav-btn danger" id="clearAllBtn">🗑 Clear History</button>
+</nav>
+
+<!-- Main Content -->
+<div class="main">
+
+  <!-- ── Stat Cards ── -->
+  <div class="section-title">📊 Overview</div>
+  <div class="stat-grid" id="statGrid">
+    <div class="stat-card total">
+      <div class="stat-label">Total Campaigns</div>
+      <div class="stat-value purple" id="statCampaigns">—</div>
+      <div class="stat-sub" id="statCampaignSub">loading…</div>
+    </div>
+    <div class="stat-card success">
+      <div class="stat-label">Emails Drafted / Sent</div>
+      <div class="stat-value green" id="statSuccess">—</div>
+      <div class="stat-sub" id="statSuccessSub"></div>
+    </div>
+    <div class="stat-card failed">
+      <div class="stat-label">Failed</div>
+      <div class="stat-value red" id="statFailed">—</div>
+      <div class="stat-sub" id="statFailedSub"></div>
+    </div>
+    <div class="stat-card rate">
+      <div class="stat-label">Success Rate</div>
+      <div class="stat-value amber" id="statRate">—</div>
+      <div class="stat-sub">across all campaigns</div>
+    </div>
+    <div class="stat-card time">
+      <div class="stat-label">Avg Duration</div>
+      <div class="stat-value blue" id="statAvgTime">—</div>
+      <div class="stat-sub">per campaign</div>
+    </div>
+  </div>
+
+  <!-- ── Charts ── -->
+  <div class="section-title">📈 Trends</div>
+  <div class="charts-row">
+
+    <!-- Donut -->
+    <div class="chart-card">
+      <div class="chart-title">Success vs Failed</div>
+      <canvas id="donutCanvas" width="220" height="160"></canvas>
+      <div class="donut-wrap" id="donutLegend"></div>
+    </div>
+
+    <!-- Bar — emails per day -->
+    <div class="chart-card">
+      <div class="chart-title">Emails per Day (Last 14 Days)</div>
+      <canvas id="barCanvas" width="340" height="180"></canvas>
+    </div>
+
+    <!-- Provider breakdown -->
+    <div class="chart-card">
+      <div class="chart-title">Provider Breakdown</div>
+      <canvas id="provCanvas" width="280" height="180"></canvas>
+    </div>
+
+  </div>
+
+  <!-- ── Campaign History ── -->
+  <div class="section-title">📋 Campaign History</div>
+
+  <div class="filters-row">
+    <input class="filter-input" type="text" id="searchFilter" placeholder="🔍  Search campaigns…" />
+    <select class="filter-select" id="statusFilter">
+      <option value="">All Statuses</option>
+      <option value="completed">Completed</option>
+      <option value="partial">Partial</option>
+      <option value="failed">Failed</option>
+      <option value="running">Running</option>
+    </select>
+    <select class="filter-select" id="providerFilter">
+      <option value="">All Providers</option>
+      <option value="Gmail">Gmail</option>
+      <option value="Outlook (Live)">Outlook Live</option>
+      <option value="Outlook (Office 365)">Outlook 365</option>
+      <option value="Yahoo Mail">Yahoo Mail</option>
+    </select>
+    <div class="filter-spacer"></div>
+    <button class="export-btn" id="exportFilteredBtn">⬇ Export Filtered</button>
+  </div>
+
+  <div class="table-wrap" id="tableWrap">
+    <table>
+      <thead>
+        <tr>
+          <th data-sort="name">Campaign <span class="sort-icon">↕</span></th>
+          <th data-sort="provider">Provider <span class="sort-icon">↕</span></th>
+          <th data-sort="createdAt">Date <span class="sort-icon">↕</span></th>
+          <th data-sort="status">Status <span class="sort-icon">↕</span></th>
+          <th data-sort="total">Recipients <span class="sort-icon">↕</span></th>
+          <th>Progress</th>
+          <th data-sort="durationMs">Duration <span class="sort-icon">↕</span></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="campaignTbody"></tbody>
+    </table>
+    <div id="emptyState" class="empty-state" style="display:none">
+      <div class="empty-icon">📭</div>
+      <div class="empty-title">No campaigns yet</div>
+      <div class="empty-sub">Run your first mail merge from the extension popup.<br/>Each merge run is automatically saved here.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="reports.js"></script>
+</body>
+</html>
