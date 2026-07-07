@@ -1,0 +1,160 @@
+{
+  "name": "Universal Mail Merger MCP Server",
+  "description": "Model Context Protocol adapter exposing mail merger selectors, CSV parsing, and template resolution functionality to AI Agents.",
+  "organization": "Universal Mail Merger Open Source Team",
+  "version": "3.0.0",
+  "homepage": "https://github.com/krchandanvk/mergemail",
+  "documentation": "https://github.com/krchandanvk/mergemail/blob/main/docs/ai-agent.md",
+  "support": "https://github.com/krchandanvk/mergemail/issues",
+  "contact": "support@universalmailmerger.io",
+  "logo": "https://github.com/krchandanvk/mergemail/raw/main/icons/icon128.png",
+  "authentication": {
+    "type": "none",
+    "description": "Local client-side execution; no external authorization required."
+  },
+  "transports": [
+    "stdio",
+    "sse"
+  ],
+  "protocols": [
+    "mcp-v1.0.0"
+  ],
+  "capabilities": {
+    "resources": true,
+    "prompts": true,
+    "tools": true
+  },
+  "resources": [
+    {
+      "uri": "umm://selectors",
+      "name": "Selectors configuration",
+      "description": "List of CSS selectors mapped to each support provider (Gmail, Outlook, Yahoo Mail).",
+      "mimeType": "application/json"
+    },
+    {
+      "uri": "umm://sample-csv",
+      "name": "Sample CSV template",
+      "description": "Standard structure for mail merge recipient databases.",
+      "mimeType": "text/csv"
+    }
+  ],
+  "prompts": [
+    {
+      "name": "Compose Email Template",
+      "description": "Guide the agent to structure a highly personalized email template utilizing custom merge variables.",
+      "arguments": [
+        {
+          "name": "recipientName",
+          "description": "Name of the target candidate/recipient",
+          "required": true
+        },
+        {
+          "name": "company",
+          "description": "Target organization name",
+          "required": false
+        }
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "name": "parse_csv",
+      "description": "Extract headers and rows from a raw CSV file. Handles quotes, commas, and BOM characters.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "csvText": {
+            "type": "string",
+            "description": "Raw CSV content to parse"
+          }
+        },
+        "required": [
+          "csvText"
+        ]
+      }
+    },
+    {
+      "name": "auto_detect_columns",
+      "description": "Inspect CSV headers and auto-suggest standard mappings (name, email, company, role).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "headers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of CSV column headers"
+          }
+        },
+        "required": [
+          "headers"
+        ]
+      }
+    },
+    {
+      "name": "resolve_template",
+      "description": "Substitute variables inside email templates (subject and body) in a case-insensitive manner.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "template": {
+            "type": "string",
+            "description": "The message body containing {{variables}}"
+          },
+          "row": {
+            "type": "object",
+            "description": "Key-value map containing the data fields"
+          }
+        },
+        "required": [
+          "template",
+          "row"
+        ]
+      }
+    },
+    {
+      "name": "validate_merge",
+      "description": "Verify email list formats and validate that all placeholders used in templates exist in the data source.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "description": "Parsed recipient rows"
+          },
+          "subject": {
+            "type": "string",
+            "description": "Email subject line template"
+          },
+          "body": {
+            "type": "string",
+            "description": "Email body template"
+          },
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Keys available in the mapped source"
+          }
+        },
+        "required": [
+          "rows",
+          "subject",
+          "body",
+          "keys"
+        ]
+      }
+    }
+  ],
+  "endpoints": {
+    "health": "/health",
+    "readiness": "/ready",
+    "metrics": "/metrics",
+    "openapi": "/openapi.json"
+  }
+}

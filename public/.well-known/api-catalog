@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "1.0.0",
+  "endpoints": [
+    {
+      "name": "System Health Status",
+      "method": "GET",
+      "route": "/health",
+      "description": "Retrieve current server system, local storage and background state info.",
+      "authentication": "none",
+      "requestSchema": {},
+      "responseSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "degraded",
+              "down"
+            ]
+          },
+          "timestamp": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object"
+          }
+        }
+      },
+      "examples": [
+        {
+          "response": {
+            "status": "healthy",
+            "timestamp": "2026-07-07T05:00:00Z",
+            "details": {
+              "storage": "ok"
+            }
+          }
+        }
+      ],
+      "version": "3.0.0",
+      "owner": "core-team",
+      "tags": [
+        "health",
+        "system"
+      ]
+    },
+    {
+      "name": "System Metrics",
+      "method": "GET",
+      "route": "/metrics",
+      "description": "Retrieve real-time telemetry metrics for mail merge throughput.",
+      "authentication": "none",
+      "requestSchema": {},
+      "responseSchema": {
+        "type": "object",
+        "properties": {
+          "campaignsTotal": {
+            "type": "number"
+          },
+          "emailsProcessed": {
+            "type": "number"
+          },
+          "successRate": {
+            "type": "number"
+          },
+          "averageLatencyMs": {
+            "type": "number"
+          }
+        }
+      },
+      "examples": [
+        {
+          "response": {
+            "campaignsTotal": 24,
+            "emailsProcessed": 540,
+            "successRate": 0.992,
+            "averageLatencyMs": 15300
+          }
+        }
+      ],
+      "version": "3.0.0",
+      "owner": "analytics-team",
+      "tags": [
+        "metrics",
+        "telemetry"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Universal Mail Merger AI API",
+    "description": "Automated API for local execution tracking, metadata cataloging, and validation tools within UMM.",
+    "version": "3.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "System Health",
+        "responses": {
+          "200": {
+            "description": "System health structure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "uptime": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "summary": "Readiness Probe",
+        "responses": {
+          "200": {
+            "description": "Ready state"
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "summary": "Performance Metrics",
+        "responses": {
+          "200": {
+            "description": "Machine-readable dashboard statistics"
+          }
+        }
+      }
+    }
+  }
+}

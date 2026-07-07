@@ -1,0 +1,42 @@
+name: AI Agent Integration Validator
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    name: Build and Validate AI Schemas
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Schema Discovery & Generation
+        run: npm run ai:discover
+
+      - name: Verify Generated Files Exist
+        run: |
+          test -f public/.well-known/mcp/server-card.json
+          test -f public/.well-known/agent-skills/index.json
+          test -f public/.well-known/api-catalog
+          test -f public/openapi.json
+          test -f docs/ai-agent.md
+          test -f docs/mcp.md
+          test -f docs/skills.md
+          test -f docs/apis.md
+
+      - name: Run Express Server Integration & Schema Unit Tests
+        run: npm run ai:validate

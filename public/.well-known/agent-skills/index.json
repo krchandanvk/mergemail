@@ -1,0 +1,200 @@
+{
+  "schemaVersion": "1.0.0",
+  "skills": [
+    {
+      "id": "csv_import",
+      "name": "CSV Import",
+      "category": "data_parsing",
+      "description": "Parses arbitrary CSV file uploads, cleans BOM prefixes, processes quotation marks, and handles comma delimiters.",
+      "permissions": [
+        "localFiles"
+      ],
+      "authentication": "none",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "csvText": {
+            "type": "string",
+            "description": "Raw CSV content"
+          }
+        },
+        "required": [
+          "csvText"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "headers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "examples": [
+        {
+          "input": {
+            "csvText": "Name,Email\nAlice,alice@example.com"
+          },
+          "output": {
+            "headers": [
+              "Name",
+              "Email"
+            ],
+            "rows": [
+              {
+                "Name": "Alice",
+                "Email": "alice@example.com"
+              }
+            ]
+          }
+        }
+      ],
+      "tags": [
+        "csv",
+        "import",
+        "parse"
+      ],
+      "version": "1.0.0"
+    },
+    {
+      "id": "bulk_email_drafting",
+      "name": "Bulk Email Drafting",
+      "category": "messaging",
+      "description": "Triggers sequential, personalized draft creation inside webmail interfaces with a randomized/custom sleep delay.",
+      "permissions": [
+        "activeTab",
+        "scripting"
+      ],
+      "authentication": "activeTabSession",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "resolvedEmails": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "email",
+                "subject",
+                "body"
+              ]
+            }
+          },
+          "autoSend": {
+            "type": "boolean",
+            "description": "Whether to automatically send drafts immediately"
+          },
+          "interval": {
+            "type": "number",
+            "description": "Delay in ms between drafts"
+          }
+        },
+        "required": [
+          "resolvedEmails"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "total": {
+            "type": "number"
+          }
+        }
+      },
+      "examples": [
+        {
+          "input": {
+            "resolvedEmails": [
+              {
+                "email": "alice@example.com",
+                "subject": "Hi Alice",
+                "body": "Hello Alice"
+              }
+            ],
+            "autoSend": false,
+            "interval": 3000
+          },
+          "output": {
+            "success": true,
+            "total": 1
+          }
+        }
+      ],
+      "tags": [
+        "email",
+        "draft",
+        "merge",
+        "bulk"
+      ],
+      "version": "3.0.0"
+    },
+    {
+      "id": "campaign_analytics",
+      "name": "Campaign Analytics",
+      "category": "analytics",
+      "description": "Summarizes completed and partial merge campaigns, displaying success rates, timings, and error logs.",
+      "permissions": [
+        "storage"
+      ],
+      "authentication": "none",
+      "inputSchema": {},
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaignsCount": {
+            "type": "number"
+          },
+          "successCount": {
+            "type": "number"
+          },
+          "failedCount": {
+            "type": "number"
+          },
+          "averageDurationMs": {
+            "type": "number"
+          }
+        }
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {
+            "campaignsCount": 5,
+            "successCount": 154,
+            "failedCount": 3,
+            "averageDurationMs": 14500
+          }
+        }
+      ],
+      "tags": [
+        "analytics",
+        "metrics",
+        "history"
+      ],
+      "version": "3.0.0"
+    }
+  ]
+}
