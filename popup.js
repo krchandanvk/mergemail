@@ -1,545 +1,808 @@
 /**
- * popup.js v3 — Universal Mail Merger Popup Controller
+ * popup.js v4 — Universal Mail Merger Popup Controller
+ * ES Module entry point — imports all service classes.
  *
- * NEW in v3:
- *  - Campaign naming (auto-generated or user-defined)
- *  - Campaign creation/update via background.js messages
- *  - Campaigns tab: quick stats + recent history list
- *  - Reports tab opener (chrome.tabs.create via background)
- *  - Full Selector Tester
- *  - All v2 features: tabs, templates, CSV, storage persistence, Send All, preview
+ * Architecture:
+ *   Services  → pure business logic (no DOM)
+ *   popup.js  → thin controller (DOM wiring + state)
+ *   content.js → automation (receives pre-resolved emails)
  */
 
-// ─── Utility: background messaging ──────────────────────────────────────────
-const bg = (type, payload = {}) =>
-  new Promise((res) => chrome.runtime.sendMessage({ type, ...payload }, res));
+import { CSVParser }           from './services/csv-parser.js';
+import { ColumnMapper, STANDARD_FIELDS } from './services/column-mapper.js';
+import { MergeFieldService }   from './services/merge-field-service.js';
+import { TemplateRenderer }    from './services/template-renderer.js';
+import { RecipientValidator }  from './services/recipient-validator.js';
+import { EmailGenerator }      from './services/email-generator.js';
 
-// ─── Tab Navigation ──────────────────────────────────────────────────────────
-document.querySelectorAll(".tab-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
-    document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
-    btn.classList.add("active");
-    document.getElementById("panel-" + btn.dataset.tab).classList.add("active");
-    if (btn.dataset.tab === "campaigns") loadCampaignHistory();
+// ─── Background Messaging ─────────────────────────────────────────────────────
+const bg = (type, payload = {}) =>
+  new Promise(res => chrome.runtime.sendMessage({ type, ...payload }, res));
+
+// ─── App State ────────────────────────────────────────────────────────────────
+const state = {
+  // CSV
+  csvFileName:  '',
+  csvHeaders:   [],
+  csvRows:      [],      // raw CSV rows { header: value }
+  csvMappings:  {},      // { header → mergeKey | 'ignore' }
+
+  // Resolved data
+  mergeFields:  [],      // MergeField[] — drives chips
+  recipientRows:[],      // { mergeKey: value }[] — ready for EmailGenerator
+  mode:         'email', // 'csv' | 'email'
+
+  // Email-only settings
+  extractNames: true,
+
+  // Campaign
+  activeCampaignId: null,
+  mergeStartTime:   null,
+};
+
+// ─── DOM Helpers ──────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const saveStateKeys = ['recipients', 'subject', 'body', 'sendAll', 'campaignName'];
+
+// ─── Tab Navigation ───────────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    $(`panel-${btn.dataset.tab}`).classList.add('active');
+    if (btn.dataset.tab === 'campaigns') loadCampaignHistory();
   });
 });
 
-// ─── DOM References ──────────────────────────────────────────────────────────
-const campaignNameInput  = document.getElementById("campaignName");
-const recipientsTextarea = document.getElementById("recipients");
-const subjectInput       = document.getElementById("subject");
-const bodyTextarea       = document.getElementById("body");
-const startBtn           = document.getElementById("startBtn");
-const statusBox          = document.getElementById("statusBox");
-const statusIcon         = document.getElementById("statusIcon");
-const statusText         = document.getElementById("statusText");
-const progressBar        = document.getElementById("progressBar");
-const progressFill       = document.getElementById("progressFill");
-const charCount          = document.getElementById("charCount");
-const recipientBadge     = document.getElementById("recipientBadge");
-const sendAllToggle      = document.getElementById("sendAllToggle");
-const previewBtn         = document.getElementById("previewBtn");
-const previewPanel       = document.getElementById("previewPanel");
-const previewTo          = document.getElementById("previewTo");
-const previewSubject     = document.getElementById("previewSubject");
-const previewBodyEl      = document.getElementById("previewBody");
-const previewIndex       = document.getElementById("previewIndex");
-const openReportsBtn     = document.getElementById("openReportsBtn");
-
-// ─── State ───────────────────────────────────────────────────────────────────
-let csvRows    = [];
-let mergedRows = [];
-let previewIdx = 0;
-let activeCampaignId = null;
-let mergeStartTime   = null;
-
-// ─── Campaign Name Auto-fill ──────────────────────────────────────────────────
-function generateCampaignName() {
-  const now = new Date();
-  return `Campaign — ${now.toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
-}
-
-// ─── Persistence ─────────────────────────────────────────────────────────────
-const STORAGE_KEYS = ["recipients", "subject", "body", "sendAll", "campaignName"];
-
+// ─── Persistence ──────────────────────────────────────────────────────────────
 function saveState() {
   chrome.storage.local.set({
-    recipients:   recipientsTextarea.value,
-    subject:      subjectInput.value,
-    body:         bodyTextarea.value,
-    sendAll:      sendAllToggle.checked,
-    campaignName: campaignNameInput.value,
+    recipients:   $('recipients').value,
+    subject:      $('subject').value,
+    body:         $('body').value,
+    sendAll:      $('sendAllToggle').checked,
+    campaignName: $('campaignName').value,
   });
 }
 
-async function loadState() {
-  const data = await chrome.storage.local.get(STORAGE_KEYS);
-  if (data.recipients)   recipientsTextarea.value = data.recipients;
-  if (data.subject)      subjectInput.value        = data.subject;
-  if (data.body)         bodyTextarea.value         = data.body;
-  if (data.sendAll)      sendAllToggle.checked      = data.sendAll;
-  campaignNameInput.value = data.campaignName || generateCampaignName();
+async function restoreState() {
+  const data = await chrome.storage.local.get(saveStateKeys);
+  if (data.recipients)   $('recipients').value   = data.recipients;
+  if (data.subject)      $('subject').value       = data.subject;
+  if (data.body)         $('body').value          = data.body;
+  if (data.sendAll)      $('sendAllToggle').checked = data.sendAll;
+  $('campaignName').value = data.campaignName || generateCampaignName();
+  updateCharCount();
+  onRecipientsChange();
+}
+
+function generateCampaignName() {
+  const now = new Date();
+  return `Campaign — ${now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+// ─── Compose Tab: Basic Events ────────────────────────────────────────────────
+$('campaignName').addEventListener('input', saveState);
+$('subject').addEventListener('input', () => { saveState(); runLiveValidation(); refreshPreview(); });
+$('body').addEventListener('input', () => { saveState(); updateCharCount(); runLiveValidation(); refreshPreview(); });
+$('recipients').addEventListener('input', () => { saveState(); onRecipientsChange(); });
+$('extractNamesCheck').addEventListener('change', () => {
+  state.extractNames = $('extractNamesCheck').checked;
+  onRecipientsChange();
+});
+
+function updateCharCount() {
+  $('charCount').textContent = $('body').value.length + ' chars';
+}
+
+// ─── Recipient Mode Management ────────────────────────────────────────────────
+function onRecipientsChange() {
+  if (state.mode === 'csv') return; // CSV drives everything, ignore manual text
+  buildEmailModeRows();
+  renderChips();
   updateRecipientBadge();
-  charCount.textContent = bodyTextarea.value.length + " chars";
-}
-loadState();
-
-[recipientsTextarea, subjectInput, bodyTextarea, sendAllToggle, campaignNameInput].forEach((el) => {
-  el.addEventListener("input", saveState);
-  el.addEventListener("change", saveState);
-});
-
-// ─── Template Engine ──────────────────────────────────────────────────────────
-function resolveTemplate(template, row) {
-  return template.replace(/\{\{(\w+)\}\}/g, (m, k) => k in row ? row[k] : m);
+  runLiveValidation();
+  rebuildPreviewDropdown();
 }
 
-function buildMergedRows() {
-  const rawEmails = parseRecipients(recipientsTextarea.value);
-  mergedRows = csvRows.length > 0
-    ? csvRows.map((r) => ({ ...r }))
-    : rawEmails.map((email) => ({ email }));
-  return mergedRows;
+function buildEmailModeRows() {
+  const raw    = $('recipients').value;
+  const emails = parseEmailList(raw);
+  state.recipientRows = EmailGenerator.fromEmails(emails, state.extractNames);
+  state.mergeFields   = MergeFieldService.forEmailOnly(state.extractNames);
 }
 
-// ─── Merge Chips ─────────────────────────────────────────────────────────────
-document.querySelectorAll(".chip").forEach((chip) => {
-  chip.addEventListener("click", () => {
-    const tag    = `{{${chip.dataset.var}}}`;
-    const active = document.activeElement;
-    const target = [bodyTextarea, subjectInput].includes(active) ? active : bodyTextarea;
-    const s = target.selectionStart, e = target.selectionEnd;
-    target.value = target.value.slice(0, s) + tag + target.value.slice(e);
-    target.selectionStart = target.selectionEnd = s + tag.length;
-    target.focus();
-    saveState();
-  });
-});
+function parseEmailList(raw) {
+  return raw.split(/[\n,]+/).map(e => e.trim()).filter(Boolean);
+}
 
-// ─── Recipient Badge ─────────────────────────────────────────────────────────
 function updateRecipientBadge() {
-  const count = csvRows.length > 0
-    ? csvRows.length
-    : parseRecipients(recipientsTextarea.value).length;
+  const badge = $('recipientBadge');
+  const count = state.recipientRows.length;
   if (count > 0) {
-    recipientBadge.textContent = `${count} recipient${count !== 1 ? "s" : ""}`;
-    recipientBadge.style.display = "inline-flex";
+    badge.textContent  = `${count} recipient${count !== 1 ? 's' : ''}`;
+    badge.style.display = 'inline-flex';
   } else {
-    recipientBadge.style.display = "none";
+    badge.style.display = 'none';
   }
-  buildMergedRows();
+}
+
+// ─── Mode: email vs CSV ───────────────────────────────────────────────────────
+function setMode(mode) {
+  state.mode = mode;
+  const isCsv   = mode === 'csv';
+
+  // Show/hide recipient areas
+  $('csvSourceBox').classList.toggle('visible', isCsv);
+  $('recipients').style.display       = isCsv ? 'none' : 'block';
+  $('emailModeBanner').classList.toggle('visible', !isCsv);
+
+  if (isCsv) {
+    renderCsvSourceBox();
+  } else {
+    buildEmailModeRows();
+    renderChips();
+    updateRecipientBadge();
+  }
+  runLiveValidation();
+  rebuildPreviewDropdown();
+}
+
+function renderCsvSourceBox() {
+  const count = state.recipientRows.length;
+  $('csvSourceTitle').textContent = `📋 ${count} recipient${count !== 1 ? 's' : ''} from CSV`;
+
+  // Mapped fields summary
+  const standardMapped = state.mergeFields.filter(f => f.isStandard).map(f => `✓ ${f.label}`);
+  const customMapped   = state.mergeFields.filter(f => !f.isStandard).map(f => `{{${f.key}}}`);
+  $('csvSourceMeta').textContent = [
+    `${state.csvHeaders.length} columns`,
+    ...standardMapped,
+  ].join(' · ');
+
+  // Field chips
+  const chipsEl = $('csvFieldChips');
+  chipsEl.innerHTML = '';
+  state.mergeFields.forEach(f => {
+    const chip = document.createElement('span');
+    chip.className   = 'merge-chip available';
+    chip.textContent = `{{${f.key}}}`;
+    chip.style.fontSize = '9px';
+    chipsEl.appendChild(chip);
+  });
+
+  updateRecipientBadge();
+}
+
+// ─── Dynamic Chips ────────────────────────────────────────────────────────────
+function renderChips() {
+  const wrap    = $('chipsWrap');
+  const fields  = state.mergeFields;
+  const subject = $('subject').value;
+  const body    = $('body').value;
+  const usedVars = new Set([
+    ...TemplateRenderer.extractVars(subject),
+    ...TemplateRenderer.extractVars(body),
+  ]);
+
+  if (!fields.length) {
+    const hasEmails = state.recipientRows.length > 0;
+    wrap.innerHTML = hasEmails
+      ? '<span class="chips-empty">Upload a CSV to enable {{name}}, {{company}}, and more</span>'
+      : '<span class="chips-empty">Upload a CSV or enter emails to enable merge fields</span>';
+    return;
+  }
+
+  wrap.innerHTML = '';
+  fields.forEach(field => {
+    const chip    = document.createElement('span');
+    chip.dataset.key = field.key;
+    chip.textContent = `{{${field.key}}}`;
+    chip.title       = `${field.label} — from CSV column "${field.csvHeader}"`;
+
+    if (field.isEstimated) {
+      chip.className = 'merge-chip estimated';
+      chip.title += ' (Estimated from email address)';
+    } else {
+      chip.className = 'merge-chip available';
+    }
+
+    chip.addEventListener('click', () => insertAtCursor($('body'), `{{${field.key}}}`));
+    wrap.appendChild(chip);
+  });
+
+  // Show unavailable standard fields as disabled chips
+  const availableKeys = new Set(fields.map(f => f.key));
+  STANDARD_FIELDS.filter(k => !availableKeys.has(k)).forEach(k => {
+    const chip    = document.createElement('span');
+    chip.className   = 'merge-chip unavailable';
+    chip.textContent = `{{${k}}}`;
+    chip.title       = `Upload a CSV with a "${k}" column to enable this`;
+    wrap.appendChild(chip);
+  });
+}
+
+function insertAtCursor(textarea, text) {
+  const s = textarea.selectionStart;
+  const e = textarea.selectionEnd;
+  textarea.value = textarea.value.slice(0, s) + text + textarea.value.slice(e);
+  textarea.selectionStart = textarea.selectionEnd = s + text.length;
+  textarea.focus();
+  saveState();
+  runLiveValidation();
   refreshPreview();
 }
-recipientsTextarea.addEventListener("input", updateRecipientBadge);
 
-// ─── Preview ─────────────────────────────────────────────────────────────────
-function highlightVars(str) {
-  return str.replace(/\{\{(\w+)\}\}/g, '<span class="highlight">{{$1}}</span>');
-}
-function refreshPreview() {
-  if (!previewPanel.classList.contains("visible")) return;
-  const rows = mergedRows.length ? mergedRows : [{ email: "(no recipients)" }];
-  const row  = rows[Math.min(previewIdx, rows.length - 1)];
-  previewIdx = Math.min(previewIdx, rows.length - 1);
-  previewTo.innerHTML       = highlightVars(row.email || "");
-  previewSubject.innerHTML  = highlightVars(resolveTemplate(subjectInput.value, row));
-  previewBodyEl.innerHTML   = highlightVars(resolveTemplate(bodyTextarea.value, row));
-  previewIndex.textContent  = `${previewIdx + 1} / ${rows.length}`;
-}
-
-previewBtn.addEventListener("click", () => {
-  previewPanel.classList.toggle("visible");
-  if (previewPanel.classList.contains("visible")) {
-    buildMergedRows(); previewIdx = 0; refreshPreview();
-    previewBtn.textContent = "✕ Close Preview";
-  } else {
-    previewBtn.textContent = "👁 Preview";
-  }
+// ─── Preview Panel ────────────────────────────────────────────────────────────
+$('previewBtn').addEventListener('click', () => {
+  const panel = $('previewPanel');
+  const isOpen = panel.classList.toggle('visible');
+  $('previewBtn').textContent = isOpen ? '✕ Close' : '👁 Preview';
+  if (isOpen) { rebuildPreviewDropdown(); refreshPreview(); }
 });
-document.getElementById("prevPreview").addEventListener("click", () => { if (previewIdx > 0) { previewIdx--; refreshPreview(); } });
-document.getElementById("nextPreview").addEventListener("click", () => { if (previewIdx < mergedRows.length - 1) { previewIdx++; refreshPreview(); } });
-[subjectInput, bodyTextarea].forEach((el) => el.addEventListener("input", refreshPreview));
 
-// ─── Char counter ─────────────────────────────────────────────────────────────
-bodyTextarea.addEventListener("input", () => { charCount.textContent = bodyTextarea.value.length + " chars"; });
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-function parseRecipients(raw) {
-  return raw.split(/[\n,]+/).map((e) => e.trim()).filter(Boolean);
-}
-function setStatus(type, message) {
-  statusBox.className = "status-box " + type;
-  statusIcon.textContent =
-    type === "running" ? "⏳" : type === "success" ? "✅" : type === "error" ? "❌" : "ℹ️";
-  statusText.textContent = message;
-  statusBox.style.display = "flex";
-}
-function updateProgress(current, total) {
-  const pct = total > 0 ? Math.round((current / total) * 100) : 0;
-  progressBar.style.display = "block";
-  progressFill.style.width = pct + "%";
-  progressFill.setAttribute("aria-valuenow", pct);
-}
-function resetProgress() {
-  progressBar.style.display = "none";
-  progressFill.style.width = "0%";
-}
-function lockUI(locked) {
-  [startBtn, recipientsTextarea, subjectInput, bodyTextarea, sendAllToggle].forEach((el) => el.disabled = locked);
-  startBtn.textContent = locked ? "⏳ Running…" : "🚀 Start Mail Merge";
+function rebuildPreviewDropdown() {
+  const sel   = $('previewSelect');
+  const rows  = state.recipientRows;
+  sel.innerHTML = '<option value="-1">— select recipient —</option>';
+  rows.forEach((row, i) => {
+    const label = row.name
+      ? `${row.name} (${row.email})`
+      : (row.email || `Row ${i + 1}`);
+    const opt   = document.createElement('option');
+    opt.value   = i;
+    opt.textContent = label;
+    sel.appendChild(opt);
+  });
+  if (rows.length === 1) sel.value = '0';
+  $('previewCounter').textContent = rows.length ? `${rows.length} recipient${rows.length !== 1 ? 's' : ''}` : '';
+  refreshPreview();
 }
 
-// ─── Send All Warning ─────────────────────────────────────────────────────────
-sendAllToggle.addEventListener("change", () => {
-  if (sendAllToggle.checked) {
-    const ok = confirm("⚠️ SEND ALL MODE\n\nThis will SEND every email automatically — not just create drafts.\n\nCannot be undone. Continue?");
-    if (!ok) sendAllToggle.checked = false;
+$('previewSelect').addEventListener('change', refreshPreview);
+
+function refreshPreview() {
+  if (!$('previewPanel').classList.contains('visible')) return;
+  const idx  = parseInt($('previewSelect').value, 10);
+  const row  = (idx >= 0 && state.recipientRows[idx]) ? state.recipientRows[idx] : null;
+
+  if (!row) {
+    $('previewSubjectEl').innerHTML = '<span style="color:var(--text-dim)">Select a recipient to preview</span>';
+    $('previewBodyEl').innerHTML    = '';
+    return;
+  }
+
+  const prev = EmailGenerator.previewOne(row, $('subject').value, $('body').value);
+  $('previewSubjectEl').innerHTML = prev.subjectHtml;
+  $('previewBodyEl').innerHTML    = prev.bodyHtml;
+}
+
+// ─── Live Validation ──────────────────────────────────────────────────────────
+function runLiveValidation() {
+  const panel       = $('validationPanel');
+  const subject     = $('subject').value;
+  const body        = $('body').value;
+  const availKeys   = state.mergeFields.map(f => f.key);
+  const { errors, warnings } = RecipientValidator.validate(
+    state.recipientRows, subject, body, availKeys
+  );
+
+  // Filter out NO_RECIPIENTS / INVALID_EMAIL for live-validation (don't nag while typing)
+  const displayErrors   = errors.filter(e => e.code === 'MISSING_MERGE_FIELD');
+  const displayWarnings = warnings;
+
+  if (!displayErrors.length && !displayWarnings.length) {
+    panel.innerHTML = '';
+    return;
+  }
+
+  panel.innerHTML = [
+    ...displayErrors.map(e => vItem('error', '🚫', e.message, e.hint)),
+    ...displayWarnings.map(w => vItem('warning', '⚠️', w.message, w.hint)),
+  ].join('');
+}
+
+function vItem(type, icon, msg, hint = '') {
+  return `<div class="v-item ${type}">
+    <span class="v-icon">${icon}</span>
+    <div class="v-body">
+      <div class="v-msg">${escHtml(msg)}</div>
+      ${hint ? `<div class="v-hint">${escHtml(hint)}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── Send All Toggle ──────────────────────────────────────────────────────────
+$('sendAllToggle').addEventListener('change', () => {
+  if ($('sendAllToggle').checked) {
+    const ok = confirm('⚠️ SEND ALL MODE\n\nThis will SEND every email automatically — not just create drafts.\n\nCannot be undone. Continue?');
+    if (!ok) $('sendAllToggle').checked = false;
   }
   saveState();
 });
 
 // ─── Reports Button ───────────────────────────────────────────────────────────
-openReportsBtn.addEventListener("click", () => bg("OPEN_REPORTS"));
+$('openReportsBtn').addEventListener('click', () => bg('OPEN_REPORTS'));
 
-// ─── Start Merge ──────────────────────────────────────────────────────────────
-startBtn.addEventListener("click", async () => {
-  const subject  = subjectInput.value.trim();
-  const body     = bodyTextarea.value.trim();
-  const autoSend = sendAllToggle.checked;
+// ─── Clear CSV ────────────────────────────────────────────────────────────────
+function clearCsv() {
+  state.csvFileName  = '';
+  state.csvHeaders   = [];
+  state.csvRows      = [];
+  state.csvMappings  = {};
+  state.mergeFields  = [];
+  state.recipientRows = [];
+  state.mode         = 'email';
 
-  buildMergedRows();
+  $('csvFileInfo').classList.remove('visible');
+  $('mappingSection').classList.remove('visible');
+  $('csvFileInput').value = '';
 
-  if (!recipientsTextarea.value.trim() && csvRows.length === 0) {
-    setStatus("error", "Please enter at least one recipient or import a CSV file."); return;
+  setMode('email');
+  renderChips();
+  runLiveValidation();
+}
+$('clearCsvBtn').addEventListener('click', clearCsv);
+
+// ══════════════════════════════════════════════════════════════════
+//  START MERGE
+// ══════════════════════════════════════════════════════════════════
+$('startBtn').addEventListener('click', async () => {
+  const subject  = $('subject').value.trim();
+  const body     = $('body').value.trim();
+  const autoSend = $('sendAllToggle').checked;
+
+  if (!subject) { setStatus('error', 'Subject cannot be empty.'); return; }
+  if (!body)    { setStatus('error', 'Message body cannot be empty.'); return; }
+
+  // Final validation (full — including email checks)
+  const availKeys  = state.mergeFields.map(f => f.key);
+  const validation = RecipientValidator.validate(state.recipientRows, subject, body, availKeys);
+
+  if (!validation.valid) {
+    $('validationPanel').innerHTML = validation.errors.map(e =>
+      vItem('error', '🚫', e.message, e.hint)
+    ).join('');
+    setStatus('error', `Fix ${validation.errors.length} error(s) before continuing.`);
+    return;
   }
-  if (!subject) { setStatus("error", "Subject cannot be empty."); return; }
-  if (!body)    { setStatus("error", "Message body cannot be empty."); return; }
-  if (!mergedRows.length) { setStatus("error", "No valid recipients found."); return; }
 
-  if (mergedRows.length > 10) {
-    const verb = autoSend ? "send" : "draft";
-    if (!confirm(`You are about to ${verb} ${mergedRows.length} emails. Continue?`)) return;
+  if (validation.warnings.length > 0) {
+    const proceed = confirm(
+      'Warnings:\n' + validation.warnings.map(w => '• ' + w.message).join('\n') +
+      '\n\nProceed anyway?'
+    );
+    if (!proceed) return;
   }
 
+  if (state.recipientRows.length > 10) {
+    const verb = autoSend ? 'send' : 'draft';
+    if (!confirm(`About to ${verb} ${state.recipientRows.length} emails. Continue?`)) return;
+  }
+
+  // Detect active tab
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab) { setStatus("error", "Cannot detect active tab."); return; }
+  if (!tab) { setStatus('error', 'Cannot detect active tab.'); return; }
 
-  const SUPPORTED = ["mail.google.com","outlook.live.com","outlook.office365.com","mail.yahoo.com"];
+  const SUPPORTED = ['mail.google.com','outlook.live.com','outlook.office365.com','mail.yahoo.com'];
   const tabHost   = new URL(tab.url).hostname;
-  if (!SUPPORTED.some((h) => tabHost === h || tabHost.endsWith("." + h))) {
-    setStatus("error", "Please open Gmail, Outlook, or Yahoo Mail in your active tab."); return;
+  if (!SUPPORTED.some(h => tabHost === h || tabHost.endsWith('.' + h))) {
+    setStatus('error', 'Please open Gmail, Outlook, or Yahoo Mail in your active tab first.'); return;
   }
 
-  // Detect provider name from hostname
-  const providerMap = {
-    "mail.google.com":          "Gmail",
-    "outlook.live.com":         "Outlook (Live)",
-    "outlook.office365.com":    "Outlook (Office 365)",
-    "mail.yahoo.com":           "Yahoo Mail",
+  const PROVIDER_MAP = {
+    'mail.google.com':       'Gmail',
+    'outlook.live.com':      'Outlook (Live)',
+    'outlook.office365.com': 'Outlook (Office 365)',
+    'mail.yahoo.com':        'Yahoo Mail',
   };
-  const provider = providerMap[tabHost] ||
-    Object.entries(providerMap).find(([h]) => tabHost.endsWith("." + h))?.[1] || "Unknown";
+  const provider = PROVIDER_MAP[tabHost] ||
+    Object.entries(PROVIDER_MAP).find(([h]) => tabHost.endsWith('.' + h))?.[1] || 'Unknown';
 
-  // Inject scripts (idempotent)
+  // Inject content scripts
   try {
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["selectors.js","content.js"] });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['selectors.js','content.js'] });
   } catch (_) {}
 
+  // Generate resolved emails (one per recipient)
+  const resolved = EmailGenerator.generate(state.recipientRows, subject, body);
+
+  if (!resolved.length) { setStatus('error', 'No valid emails to send.'); return; }
+
   // Create campaign record
-  const campName = campaignNameInput.value.trim() || generateCampaignName();
-  const campRes  = await bg("SAVE_CAMPAIGN", {
+  const campName = $('campaignName').value.trim() || generateCampaignName();
+  const campRes  = await bg('SAVE_CAMPAIGN', {
     campaign: {
-      name:       campName,
-      provider,
-      mode:       autoSend ? "send" : "draft",
-      subject,
-      body,
-      totalCount: mergedRows.length,
+      name: campName, provider, mode: autoSend ? 'send' : 'draft',
+      subject, body, totalCount: resolved.length,
     }
   });
-  activeCampaignId = campRes?.id || null;
-  mergeStartTime   = Date.now();
+  state.activeCampaignId = campRes?.id || null;
+  state.mergeStartTime   = Date.now();
 
   lockUI(true);
   resetProgress();
-  setStatus("running", `Starting "${campName}" — ${mergedRows.length} recipient(s)…`);
-
-  // Resolve templates
-  const resolved = mergedRows.map((row) => ({
-    email:   row.email || "",
-    subject: resolveTemplate(subject, row),
-    body:    resolveTemplate(body, row),
-  }));
+  setStatus('running', `Starting "${campName}" — ${resolved.length} recipient(s)…`);
 
   try {
     await chrome.tabs.sendMessage(tab.id, {
-      type: "START_MERGE",
-      resolved,
+      type: 'START_MERGE',
+      resolved: resolved.map(r => ({ email: r.email, subject: r.subject, body: r.body })),
       autoSend,
-      campaignId: activeCampaignId,
+      campaignId: state.activeCampaignId,
     });
   } catch (err) {
     lockUI(false);
-    setStatus("error", "Could not communicate with the page. Try refreshing the webmail tab.");
-    if (activeCampaignId) bg("FINALIZE_CAMPAIGN", { campaignId: activeCampaignId, status: "failed", durationMs: 0 });
+    setStatus('error', 'Could not communicate with the page. Refresh the webmail tab and try again.');
+    if (state.activeCampaignId) {
+      bg('FINALIZE_CAMPAIGN', { campaignId: state.activeCampaignId, status: 'failed', durationMs: 0 });
+    }
   }
 });
 
-// ─── Status Listener ─────────────────────────────────────────────────────────
-chrome.runtime.onMessage.addListener((message) => {
-  if (message.type !== "MERGE_STATUS") return;
-
+// ─── Status Listener ──────────────────────────────────────────────────────────
+chrome.runtime.onMessage.addListener(message => {
+  if (message.type !== 'MERGE_STATUS') return;
   if (message.error) {
     lockUI(false); resetProgress();
-    setStatus("error", message.error);
+    setStatus('error', message.error);
     return;
   }
   if (message.done && message.success) {
     lockUI(false);
     updateProgress(message.total, message.total);
-    const mode = sendAllToggle.checked ? "sent" : "draft(s) created";
-    setStatus("success", `✓ All ${message.total} emails ${mode}! Review before sending.`);
-    // Refresh the campaign name for next run
-    campaignNameInput.value = generateCampaignName();
+    const mode = $('sendAllToggle').checked ? 'sent' : 'draft(s) created';
+    setStatus('success', `✓ All ${message.total} emails ${mode}! Campaign saved to Reports.`);
+    $('campaignName').value = generateCampaignName();
     saveState();
     return;
   }
   updateProgress(message.current, message.total);
-  setStatus("running", `Drafting ${message.current} of ${message.total}: ${message.recipient}`);
+  setStatus('running', `Drafting ${message.current} of ${message.total}: ${message.recipient}`);
 });
 
-// ═══════════════════════════ CSV IMPORT ═══════════════════════════════════════
-
-const csvDropZone  = document.getElementById("csvDropZone");
-const csvFileInput = document.getElementById("csvFileInput");
-const csvTableWrap = document.getElementById("csvTableWrap");
-const csvThead     = document.getElementById("csvThead");
-const csvTbody     = document.getElementById("csvTbody");
-const csvInfo      = document.getElementById("csvInfo");
-const csvClearBtn  = document.getElementById("csvClearBtn");
-const applyCSVBtn  = document.getElementById("applyCSVBtn");
-const mapEmail     = document.getElementById("mapEmail");
-const mapName      = document.getElementById("mapName");
-const mapCompany   = document.getElementById("mapCompany");
-const mapRole      = document.getElementById("mapRole");
-
-let csvHeaders = [], csvRawData = [];
-
-csvDropZone.addEventListener("click",  () => csvFileInput.click());
-csvDropZone.addEventListener("keydown",(e) => { if (e.key==="Enter"||e.key===" ") csvFileInput.click(); });
-csvDropZone.addEventListener("dragover",(e) => { e.preventDefault(); csvDropZone.classList.add("drag-over"); });
-csvDropZone.addEventListener("dragleave", () => csvDropZone.classList.remove("drag-over"));
-csvDropZone.addEventListener("drop",(e) => { e.preventDefault(); csvDropZone.classList.remove("drag-over"); const f=e.dataTransfer.files[0]; if(f) processCSVFile(f); });
-csvFileInput.addEventListener("change", () => { if(csvFileInput.files[0]) processCSVFile(csvFileInput.files[0]); });
-
-function parseCSV(text) {
-  const lines = text.trim().split(/\r?\n/);
-  if (lines.length < 2) return { headers: [], rows: [] };
-  const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
-  const rows = lines.slice(1).map((line) => {
-    const cells = []; let cur = "", inQ = false;
-    for (const ch of line) {
-      if (ch==='"') inQ=!inQ;
-      else if (ch==="," && !inQ) { cells.push(cur.trim()); cur=""; }
-      else cur += ch;
-    }
-    cells.push(cur.trim());
-    const obj = {};
-    headers.forEach((h,i)=>{ obj[h]=(cells[i]||"").replace(/^"|"$/g,""); });
-    return obj;
-  }).filter((r) => Object.values(r).some(Boolean));
-  return { headers, rows };
+function setStatus(type, msg) {
+  const box = $('statusBox');
+  box.className = 'status-box ' + type;
+  $('statusIcon').textContent = { running:'⏳', success:'✅', error:'❌', idle:'ℹ️' }[type] || 'ℹ️';
+  $('statusText').textContent = msg;
+  box.style.display = 'flex';
 }
 
-function processCSVFile(file) {
+function updateProgress(cur, total) {
+  const pct = total > 0 ? Math.round((cur / total) * 100) : 0;
+  $('progressBar').style.display = 'block';
+  $('progressFill').style.width  = pct + '%';
+}
+function resetProgress() { $('progressBar').style.display = 'none'; $('progressFill').style.width = '0%'; }
+function lockUI(locked) {
+  [$('startBtn'), $('recipients'), $('subject'), $('body'), $('sendAllToggle')].forEach(el => el.disabled = locked);
+  $('startBtn').textContent = locked ? '⏳ Running…' : '🚀 Start Mail Merge';
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  CSV TAB
+// ══════════════════════════════════════════════════════════════════
+const csvDropZone = $('csvDropZone');
+const csvFileInput = $('csvFileInput');
+
+csvDropZone.addEventListener('click',   () => csvFileInput.click());
+csvDropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') csvFileInput.click(); });
+csvDropZone.addEventListener('dragover', e => { e.preventDefault(); csvDropZone.classList.add('drag-over'); });
+csvDropZone.addEventListener('dragleave', () => csvDropZone.classList.remove('drag-over'));
+csvDropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  csvDropZone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) loadCsvFile(f);
+});
+csvFileInput.addEventListener('change', () => { if (csvFileInput.files[0]) loadCsvFile(csvFileInput.files[0]); });
+$('csvRemoveBtn').addEventListener('click', clearCsv);
+
+function loadCsvFile(file) {
+  state.csvFileName = file.name;
   const reader = new FileReader();
-  reader.onload = (e) => {
-    const { headers, rows } = parseCSV(e.target.result);
-    if (!headers.length) { alert("Could not parse CSV. Ensure it has a header row."); return; }
-    csvHeaders = headers; csvRawData = rows;
-    renderCSVTable(); populateColumnMaps();
-  };
-  reader.readAsText(file,"UTF-8");
+  reader.onload = e => processCSVText(e.target.result, file.name);
+  reader.onerror = () => alert('Could not read the file. Make sure it is a valid CSV.');
+  reader.readAsText(file, 'UTF-8');
 }
 
-function renderCSVTable() {
-  const PREV = 5;
-  csvThead.innerHTML = `<tr>${csvHeaders.map((h)=>`<th>${h}</th>`).join("")}</tr>`;
-  csvTbody.innerHTML = csvRawData.slice(0,PREV).map((r)=>
-    `<tr>${csvHeaders.map((h)=>`<td title="${r[h]||""}">${r[h]||""}</td>`).join("")}</tr>`
-  ).join("");
-  csvInfo.textContent = `${csvRawData.length} rows · ${csvHeaders.length} columns${csvRawData.length>PREV?` (showing first ${PREV})`:""}`;
-  csvTableWrap.classList.add("visible");
-}
+function processCSVText(text, name = 'file.csv') {
+  const { headers, rows } = CSVParser.parse(text);
 
-function populateColumnMaps() {
-  [mapEmail,mapName,mapCompany,mapRole].forEach((sel)=>{
-    sel.innerHTML = `<option value="">— ${sel===mapEmail?"select":"none"} —</option>`;
-    csvHeaders.forEach((h)=>{ const o=document.createElement("option"); o.value=o.textContent=h; sel.appendChild(o); });
-    const lo = csvHeaders.map((h)=>h.toLowerCase());
-    if (sel===mapEmail)   sel.value=csvHeaders[lo.findIndex((h)=>h.includes("email")||h==="e-mail")]||"";
-    if (sel===mapName)    sel.value=csvHeaders[lo.findIndex((h)=>h.includes("name")&&!h.includes("company")&&!h.includes("last"))]||"";
-    if (sel===mapCompany) sel.value=csvHeaders[lo.findIndex((h)=>h.includes("company")||h.includes("org"))]||"";
-    if (sel===mapRole)    sel.value=csvHeaders[lo.findIndex((h)=>h.includes("role")||h.includes("title")||h.includes("position"))]||"";
-  });
-}
-
-csvClearBtn.addEventListener("click",()=>{
-  csvHeaders=[]; csvRawData=[]; csvRows=[]; mergedRows=[];
-  csvTableWrap.classList.remove("visible");
-  csvThead.innerHTML=csvTbody.innerHTML=""; csvFileInput.value="";
-  recipientsTextarea.value=""; updateRecipientBadge(); saveState();
-});
-
-applyCSVBtn.addEventListener("click",()=>{
-  const ec=mapEmail.value, nc=mapName.value, cc=mapCompany.value, rc=mapRole.value;
-  if (!ec) { alert("Please select which CSV column contains email addresses."); return; }
-  csvRows = csvRawData.map((row)=>({
-    email:   row[ec]||"",
-    name:    nc?(row[nc]||""):"",
-    company: cc?(row[cc]||""):"",
-    role:    rc?(row[rc]||""):"",
-    ...row,
-  })).filter((r)=>r.email);
-  recipientsTextarea.value = csvRows.map((r)=>r.email).join("\n");
-  saveState(); updateRecipientBadge();
-  document.querySelector('[data-tab="compose"]').click();
-  setStatus("idle",`✓ Loaded ${csvRows.length} recipient(s) from CSV.`);
-  statusBox.style.display="flex";
-});
-
-// ═══════════════════════════ CAMPAIGN HISTORY TAB ═════════════════════════════
-
-async function loadCampaignHistory() {
-  const res       = await bg("GET_CAMPAIGNS");
-  const campaigns = res?.campaigns || [];
-  const total     = campaigns.length;
-  const totalS    = campaigns.reduce((s,c)=>s+(c.stats?.success||0),0);
-  const totalAll  = campaigns.reduce((s,c)=>s+(c.stats?.total||0),0);
-  const rate      = totalAll>0 ? Math.round((totalS/totalAll)*100) : 0;
-
-  document.getElementById("qTotalCampaigns").textContent = total || "0";
-  document.getElementById("qTotalSuccess").textContent   = totalS || "0";
-  document.getElementById("qSuccessRate").textContent    = totalAll ? rate + "%" : "—";
-
-  const list = document.getElementById("campHistoryList");
-  if (!campaigns.length) {
-    list.innerHTML = `<div class="camp-empty">No campaigns yet. Run a merge to see history here.</div>`;
+  if (!headers.length) {
+    alert('Could not parse CSV. Make sure the file has a header row and is comma-separated.');
+    return;
+  }
+  if (!rows.length) {
+    alert('The CSV appears to have no data rows. Add at least one recipient row.');
     return;
   }
 
-  list.innerHTML = campaigns.slice(0, 8).map((c) => {
+  state.csvHeaders  = headers;
+  state.csvRows     = rows;
+  const { mappings, unmapped } = ColumnMapper.autoDetect(headers);
+  state.csvMappings = mappings;
+
+  // Show file info
+  $('csvFileInfo').classList.add('visible');
+  $('csvFileName').textContent  = name;
+  $('csvFileStats').textContent = `${rows.length} row${rows.length !== 1 ? 's' : ''} · ${headers.length} column${headers.length !== 1 ? 's' : ''} · ${unmapped.length} custom field${unmapped.length !== 1 ? 's' : ''}`;
+
+  renderMappingTable();
+  renderMappingSummary();
+  $('mappingSection').classList.add('visible');
+  $('downloadSampleBtnEmpty').style.display = 'none';
+}
+
+// ─── Mapping Table ────────────────────────────────────────────────────────────
+function renderMappingTable() {
+  const tbody = $('mappingTbody');
+  tbody.innerHTML = '';
+
+  state.csvHeaders.forEach(header => {
+    const currentKey = state.csvMappings[header] || ColumnMapper.toMergeKey(header);
+    const isAuto     = Object.values({ name:'name',email:'email',company:'company',role:'role' }).includes(currentKey);
+    const isIgnored  = currentKey === 'ignore';
+
+    const tr = document.createElement('tr');
+
+    // Status dot
+    const tdStatus = document.createElement('td');
+    tdStatus.className = 'map-status';
+    tdStatus.textContent = isIgnored ? '–' : isAuto ? '✓' : '⚙';
+    tdStatus.title = isIgnored ? 'Ignored' : isAuto ? 'Auto-detected' : 'Custom field';
+    tr.appendChild(tdStatus);
+
+    // Header name
+    const tdHeader = document.createElement('td');
+    tdHeader.className = 'map-header';
+    tdHeader.textContent = header;
+    tr.appendChild(tdHeader);
+
+    // Maps-to dropdown
+    const tdSelect = document.createElement('td');
+    const sel = document.createElement('select');
+    sel.className = 'map-select';
+    sel.innerHTML = `
+      <optgroup label="Standard Fields">
+        <option value="name"    ${currentKey==='name'    ?'selected':''}>Name  {{name}}</option>
+        <option value="email"   ${currentKey==='email'   ?'selected':''}>Email  {{email}}</option>
+        <option value="company" ${currentKey==='company' ?'selected':''}>Company  {{company}}</option>
+        <option value="role"    ${currentKey==='role'    ?'selected':''}>Role  {{role}}</option>
+      </optgroup>
+      <optgroup label="Custom">
+        <option value="${ColumnMapper.toMergeKey(header)}"
+          ${!STANDARD_FIELDS.includes(currentKey) && currentKey !== 'ignore' ? 'selected':''}>
+          Custom: {{${ColumnMapper.toMergeKey(header)}}}
+        </option>
+      </optgroup>
+      <optgroup label="Other">
+        <option value="ignore" ${currentKey==='ignore'?'selected':''}>— Ignore column —</option>
+      </optgroup>
+    `;
+    sel.addEventListener('change', () => {
+      state.csvMappings[header] = sel.value;
+      // Update status dot
+      const newKey = sel.value;
+      tdStatus.textContent = newKey === 'ignore' ? '–' : STANDARD_FIELDS.includes(newKey) ? '✓' : '⚙';
+      // Update key chip
+      tdKey.textContent = newKey === 'ignore' ? '—' : `{{${newKey}}}`;
+      tdKey.className   = 'map-key' + (newKey === 'ignore' ? ' ignored' : '');
+      renderMappingSummary();
+    });
+    tdSelect.appendChild(sel);
+    tr.appendChild(tdSelect);
+
+    // Key preview
+    const tdKey = document.createElement('td');
+    tdKey.className   = 'map-key' + (isIgnored ? ' ignored' : '');
+    tdKey.textContent = isIgnored ? '—' : `{{${currentKey}}}`;
+    tr.appendChild(tdKey);
+
+    tbody.appendChild(tr);
+  });
+}
+
+// ─── Mapping Summary ──────────────────────────────────────────────────────────
+function renderMappingSummary() {
+  const summary = $('mappingSummary');
+  const activeKeys = ColumnMapper.getActiveKeys(state.csvMappings);
+  const standardKeys = activeKeys.filter(k => STANDARD_FIELDS.includes(k));
+  const customKeys   = activeKeys.filter(k => !STANDARD_FIELDS.includes(k));
+
+  summary.innerHTML = `
+    <div class="summary-label">Mapped Fields</div>
+    <div class="summary-row">
+      ${standardKeys.map(k => `<span class="summary-chip standard">✓ ${MergeFieldService.keyToLabel(k)}</span>`).join('')}
+      ${customKeys.map(k => `<span class="summary-chip custom">{{${k}}}</span>`).join('')}
+      ${!activeKeys.length ? '<span style="font-size:10.5px;color:var(--text-dim)">No columns mapped</span>' : ''}
+    </div>
+    <div class="summary-label" style="margin-top:4px">Available Merge Variables</div>
+    <div class="summary-row">
+      ${activeKeys.map(k => `<span class="summary-chip custom">{{${k}}}</span>`).join('')}
+    </div>
+  `;
+}
+
+// ─── Apply CSV to Compose ─────────────────────────────────────────────────────
+$('applyCsvBtn').addEventListener('click', applyCSV);
+
+function applyCSV() {
+  // Validate email column exists
+  const emailKey = Object.values(state.csvMappings).find(k => k === 'email');
+  if (!emailKey) {
+    alert('Please map one column to "Email" before applying.');
+    return;
+  }
+
+  // Build recipient rows using service
+  state.recipientRows = EmailGenerator.fromCSV(state.csvRows, state.csvMappings);
+
+  // Generate merge fields
+  state.mergeFields = MergeFieldService.generateFields(state.csvHeaders, state.csvMappings);
+
+  state.mode = 'csv';
+
+  // Switch to Compose tab
+  document.querySelector('[data-tab="compose"]').click();
+
+  // Update UI
+  setMode('csv');
+  renderChips();
+  updateRecipientBadge();
+  rebuildPreviewDropdown();
+  runLiveValidation();
+  setStatus('idle', `✓ ${state.recipientRows.length} recipient(s) loaded from CSV. Variables: ${state.mergeFields.map(f=>`{{${f.key}}}`).join(', ')}`);
+  $('statusBox').style.display = 'flex';
+}
+
+// ─── Sample CSV Download ──────────────────────────────────────────────────────
+function downloadSampleCSV() {
+  const csv  = CSVParser.sampleCSV();
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'sample-recipients.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+$('downloadSampleBtn').addEventListener('click', downloadSampleCSV);
+$('downloadSampleBtnEmpty').addEventListener('click', downloadSampleCSV);
+
+// ══════════════════════════════════════════════════════════════════
+//  CAMPAIGNS TAB
+// ══════════════════════════════════════════════════════════════════
+async function loadCampaignHistory() {
+  const res       = await bg('GET_CAMPAIGNS');
+  const campaigns = res?.campaigns || [];
+  const totalS    = campaigns.reduce((s,c) => s + (c.stats?.success||0), 0);
+  const totalAll  = campaigns.reduce((s,c) => s + (c.stats?.total||0), 0);
+  const rate      = totalAll > 0 ? Math.round((totalS/totalAll)*100) : 0;
+
+  $('qCampaigns').textContent = campaigns.length || '0';
+  $('qDrafted').textContent   = totalS || '0';
+  $('qRate').textContent      = totalAll ? rate + '%' : '—';
+
+  const list = $('campHistoryList');
+  if (!campaigns.length) {
+    list.innerHTML = '<div class="camp-empty">No campaigns yet. Run a merge to see history here.</div>';
+    return;
+  }
+  list.innerHTML = campaigns.slice(0, 8).map(c => {
     const total   = c.stats?.total   || 0;
     const success = c.stats?.success || 0;
     const pct     = total > 0 ? Math.round((success/total)*100) : 0;
-    const date    = c.createdAt ? new Date(c.createdAt).toLocaleDateString(undefined,{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "";
+    const date    = c.createdAt
+      ? new Date(c.createdAt).toLocaleDateString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
+      : '';
+    const statusEmoji = {completed:'✓',partial:'⚠',failed:'✗',running:'⏳'}[c.status] || '⏳';
     return `
       <div class="camp-card">
         <div class="camp-card-top">
-          <div class="camp-card-name" title="${escHtml(c.name||"Untitled")}">${escHtml(c.name||"Untitled")}</div>
-          <span class="camp-pill ${c.status||"running"}">${statusEmoji(c.status)} ${c.status||"running"}</span>
+          <div class="camp-card-name" title="${escHtml(c.name||'Untitled')}">${escHtml(c.name||'Untitled')}</div>
+          <span class="camp-pill ${c.status||'running'}">${statusEmoji} ${c.status||'running'}</span>
         </div>
-        <div class="camp-card-meta">
-          <span>${escHtml(c.provider||"—")}</span>
-          <span>·</span>
-          <span>${success}/${total} drafted</span>
-          <span>·</span>
+        <div class="camp-meta">
+          <span>${escHtml(c.provider||'—')}</span>·
+          <span>${success}/${total}</span>
           <div class="camp-mini-bar"><div class="camp-mini-fill" style="width:${pct}%"></div></div>
           <span>${pct}%</span>
           <span style="margin-left:auto">${date}</span>
         </div>
       </div>`;
-  }).join("");
+  }).join('');
 }
 
-function statusEmoji(s) {
-  return s==="completed"?"✓":s==="partial"?"⚠":s==="failed"?"✗":"⏳";
-}
-function escHtml(str) {
-  return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-}
-
-// ═══════════════════════════ SELECTOR TESTER ═══════════════════════════════════
-
-const selectorGrid = document.getElementById("selectorGrid");
-const testAllBtn   = document.getElementById("testAllBtn");
-const testerStatus = document.getElementById("testerStatus");
-const testerIcon   = document.getElementById("testerIcon");
-const testerText   = document.getElementById("testerText");
-
-const SELECTOR_LABELS = {
-  composeButton:"Compose Button", composeWindow:"Compose Window",
-  toField:"To Field", subjectField:"Subject Field", bodyField:"Body Field",
+// ══════════════════════════════════════════════════════════════════
+//  SELECTOR TESTER TAB
+// ══════════════════════════════════════════════════════════════════
+const ALL_PROVIDERS  = ['gmail','outlook_live','outlook_office','yahoo'];
+const PROVIDER_NAMES = { gmail:'Gmail', outlook_live:'Outlook Live', outlook_office:'Outlook 365', yahoo:'Yahoo Mail' };
+const SEL_LABELS = {
+  composeButton:'Compose Button', composeWindow:'Compose Window',
+  toField:'To Field', subjectField:'Subject Field', bodyField:'Body Field',
 };
-const ALL_PROVIDERS   = ["gmail","outlook_live","outlook_office","yahoo"];
-const PROVIDER_NAMES  = { gmail:"Gmail", outlook_live:"Outlook Live", outlook_office:"Outlook 365", yahoo:"Yahoo Mail" };
 
 function buildSelectorGrid() {
-  selectorGrid.innerHTML = "";
-  ALL_PROVIDERS.forEach((provKey) => {
-    const card = document.createElement("div");
-    card.className = "selector-item";
+  const grid = $('selectorGrid');
+  grid.innerHTML = '';
+  ALL_PROVIDERS.forEach(pk => {
+    const card = document.createElement('div');
+    card.className = 'sel-card';
     card.innerHTML = `
-      <div class="selector-item-head">
-        <span class="selector-name">${PROVIDER_NAMES[provKey]}</span>
-        <span class="selector-status-dot" id="dot-${provKey}"></span>
+      <div class="sel-card-head">
+        <span class="sel-name">${PROVIDER_NAMES[pk]}</span>
+        <span class="sel-dot" id="dot-${pk}"></span>
       </div>
-      <div class="selector-item-body" id="body-${provKey}">
-        ${Object.entries(SELECTOR_LABELS).map(([k,label])=>`
-          <div class="selector-field">
-            <div class="selector-field-label">${label}</div>
-            <div class="selector-field-result" id="result-${provKey}-${k}">—</div>
-          </div>`).join("")}
+      <div class="sel-card-body" id="sbody-${pk}">
+        ${Object.entries(SEL_LABELS).map(([k,lbl]) => `
+          <div class="sel-field-row">
+            <span class="sel-field-name">${lbl}</span>
+            <span class="sel-result" id="sr-${pk}-${k}">—</span>
+          </div>`).join('')}
       </div>`;
-    selectorGrid.appendChild(card);
+    grid.appendChild(card);
   });
 }
 buildSelectorGrid();
 
-testAllBtn.addEventListener("click", async () => {
+$('testAllBtn').addEventListener('click', async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const ts = $('testerStatus'), ti = $('testerIcon'), tt = $('testerText');
   if (!tab) {
-    testerStatus.className = "status-box error"; testerIcon.textContent="❌";
-    testerText.textContent = "No active tab found."; testerStatus.style.display="flex"; return;
+    ts.className = 'status-box error'; ti.textContent='❌'; tt.textContent='No active tab.'; ts.style.display='flex'; return;
   }
-  testerStatus.className="status-box running"; testerIcon.textContent="⏳";
-  testerText.textContent="Testing selectors…"; testerStatus.style.display="flex";
-  testAllBtn.disabled=true;
+  ts.className='status-box running'; ti.textContent='⏳'; tt.textContent='Testing…'; ts.style.display='flex';
+  $('testAllBtn').disabled = true;
   try {
-    await chrome.scripting.executeScript({ target:{tabId:tab.id}, files:["selectors.js","content.js"] });
+    await chrome.scripting.executeScript({ target:{tabId:tab.id}, files:['selectors.js','content.js'] });
   } catch(_) {}
   try {
-    const [result] = await chrome.scripting.executeScript({
+    const [res] = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: () => {
-        function qFirst(sel){const ps=sel.split(",").map(s=>s.trim());for(const s of ps){try{const el=document.querySelector(s);if(el)return true;}catch(_){}}return false;}
-        const out={};
-        for(const[pk,cfg] of Object.entries(MAIL_SELECTORS)){
-          out[pk]={};
-          ["composeButton","composeWindow","toField","subjectField","bodyField"].forEach(k=>{out[pk][k]=cfg[k]?qFirst(cfg[k]):false;});
+        const qf = s => { for (const p of s.split(',').map(x=>x.trim())) { try { if(document.querySelector(p)) return true; } catch(_){} } return false; };
+        const out = {};
+        for (const [pk, cfg] of Object.entries(MAIL_SELECTORS)) {
+          out[pk] = {};
+          ['composeButton','composeWindow','toField','subjectField','bodyField']
+            .forEach(k => { out[pk][k] = cfg[k] ? qf(cfg[k]) : false; });
         }
         return out;
       }
     });
-    const results = result.value;
-    ALL_PROVIDERS.forEach((pk)=>{
-      const pr=results[pk]||{};
-      const allOk=Object.values(pr).every(Boolean);
-      const anyOk=Object.values(pr).some(Boolean);
-      const dot=document.getElementById(`dot-${pk}`);
-      dot.className=`selector-status-dot ${allOk?"found":anyOk?"":"missing"}`;
-      Object.keys(SELECTOR_LABELS).forEach(k=>{
-        const el=document.getElementById(`result-${pk}-${k}`);
-        if(el){el.className=`selector-field-result ${pr[k]?"ok":"err"}`;el.textContent=pr[k]?"✓ Found":"✗ Not found";}
+    const results = res.value;
+    ALL_PROVIDERS.forEach(pk => {
+      const pr = results[pk] || {};
+      const allOk = Object.values(pr).every(Boolean);
+      const dot = $(`dot-${pk}`);
+      dot.className = `sel-dot ${allOk ? 'found' : Object.values(pr).some(Boolean) ? '' : 'missing'}`;
+      Object.keys(SEL_LABELS).forEach(k => {
+        const el = $(`sr-${pk}-${k}`);
+        if (el) { el.className = `sel-result ${pr[k]?'ok':'err'}`; el.textContent = pr[k]?'✓ Found':'✗ Missing'; }
       });
     });
-    const host=new URL(tab.url).hostname;
-    testerStatus.className="status-box success"; testerIcon.textContent="✅";
-    testerText.textContent=`Tests complete on ${host}. ✗ entries need updating in selectors.js.`;
-  } catch(err){
-    testerStatus.className="status-box error"; testerIcon.textContent="❌";
-    testerText.textContent="Test failed: "+err.message;
+    ts.className='status-box success'; ti.textContent='✅';
+    tt.textContent = `Tests done on ${new URL(tab.url).hostname}. Fix any ✗ Missing entries in selectors.js.`;
+  } catch(err) {
+    ts.className='status-box error'; ti.textContent='❌'; tt.textContent='Test failed: ' + err.message;
   }
-  testAllBtn.disabled=false;
+  $('testAllBtn').disabled = false;
 });
+
+// ══════════════════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════════════════
+restoreState();
+
+// Show "Download Sample CSV" button when no file is loaded
+$('downloadSampleBtnEmpty').style.display = 'block';
+
+// Initialize email mode UI
+setMode('email');
+renderChips();

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Universal Mail Merger</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -13,26 +13,27 @@
       --bg:          #0c0c12;
       --surface:     #13131c;
       --surface-2:   #1a1a27;
-      --surface-3:   #222233;
+      --surface-3:   #21213a;
       --border:      #2b2b40;
-      --border-light:#34344e;
+      --border-2:    #35355a;
       --accent:      #7c5cfc;
-      --accent-glow: rgba(124,92,252,0.22);
+      --accent-glow: rgba(124,92,252,0.2);
       --accent-2:    #c084fc;
-      --text:        #e6e6f0;
-      --text-muted:  #70709a;
-      --text-dim:    #4a4a6a;
+      --text:        #e8e8f2;
+      --text-muted:  #6a6a92;
+      --text-dim:    #45456a;
       --green:       #22c55e;
-      --green-dim:   rgba(34,197,94,0.12);
+      --green-bg:    rgba(34,197,94,0.1);
       --red:         #f43f5e;
-      --red-dim:     rgba(244,63,94,0.1);
+      --red-bg:      rgba(244,63,94,0.1);
       --amber:       #f59e0b;
-      --amber-dim:   rgba(245,158,11,0.12);
+      --amber-bg:    rgba(245,158,11,0.1);
       --blue:        #60a5fa;
-      --blue-dim:    rgba(96,165,250,0.1);
-      --radius:      12px;
-      --radius-sm:   8px;
-      --radius-xs:   5px;
+      --blue-bg:     rgba(96,165,250,0.1);
+      --r:           12px;
+      --r-sm:        8px;
+      --r-xs:        5px;
+      --mono:        'JetBrains Mono', 'Courier New', monospace;
       --font:        'Inter', system-ui, sans-serif;
     }
 
@@ -40,328 +41,501 @@
       font-family: var(--font);
       background: var(--bg);
       color: var(--text);
-      width: 440px;
-      overflow-x: hidden;
+      width: 460px;
+      min-height: 520px;
       display: flex;
       flex-direction: column;
+      overflow-x: hidden;
     }
 
-    /* ── Header ── */
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+
+    /* ═══════════════════════════════════════════════════════════
+       HEADER
+    ═══════════════════════════════════════════════════════════ */
     .header {
-      background: linear-gradient(135deg, #14142a 0%, #1a1435 50%, #0f2454 100%);
-      padding: 14px 18px 0;
+      background: linear-gradient(135deg, #14142a, #1a1435 55%, #0f2454);
+      padding: 13px 18px 0;
       border-bottom: 1px solid var(--border);
-      position: relative;
-      overflow: hidden;
+      position: relative; overflow: hidden;
     }
     .header::before {
-      content:""; position:absolute; top:-50px; right:-50px;
-      width:160px; height:160px;
+      content: ""; position: absolute; top: -50px; right: -50px;
+      width: 150px; height: 150px;
       background: radial-gradient(circle, rgba(124,92,252,0.15) 0%, transparent 65%);
-      pointer-events:none;
+      pointer-events: none;
     }
-    .header-top { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+    .header-top { display: flex; align-items: center; gap: 10px; margin-bottom: 11px; }
     .logo {
-      width:34px; height:34px; flex-shrink:0;
+      width: 33px; height: 33px; flex-shrink: 0;
       background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      border-radius:9px; display:flex; align-items:center; justify-content:center;
-      font-size:16px; box-shadow: 0 3px 12px var(--accent-glow);
+      border-radius: 9px; display: flex; align-items: center;
+      justify-content: center; font-size: 16px;
+      box-shadow: 0 3px 12px var(--accent-glow);
     }
     .header-text h1 {
-      font-size:13.5px; font-weight:700; letter-spacing:-0.2px;
+      font-size: 13px; font-weight: 700; letter-spacing: -0.2px;
       background: linear-gradient(90deg, #fff 40%, var(--accent-2));
-      -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
-    .header-text p { font-size:10.5px; color:var(--text-muted); margin-top:2px; }
-    .badge-row { display:flex; gap:5px; margin-bottom:10px; }
+    .header-text p { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+    .badge-row { display: flex; gap: 5px; margin-bottom: 9px; }
     .badge {
-      font-size:9.5px; font-weight:600; padding:2px 7px;
-      border-radius:20px; background:rgba(255,255,255,0.05);
-      border:1px solid var(--border); color:var(--text-muted); letter-spacing:0.3px;
+      font-size: 9px; font-weight: 600; padding: 2px 7px;
+      border-radius: 20px; background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border); color: var(--text-muted);
     }
-    .badge.gmail   { border-color:rgba(234,67,53,0.4);   color:#f87171; }
-    .badge.outlook { border-color:rgba(0,120,212,0.4);   color:#60a5fa; }
-    .badge.yahoo   { border-color:rgba(192,45,208,0.4);  color:#c084fc; }
+    .badge.gmail   { border-color: rgba(234,67,53,0.4); color: #f87171; }
+    .badge.outlook { border-color: rgba(0,120,212,0.4); color: #60a5fa; }
+    .badge.yahoo   { border-color: rgba(192,45,208,0.4);color: #c084fc; }
 
-    /* ── Tabs ── */
+    /* ═══════════════════════════════════════════════════════════
+       TABS
+    ═══════════════════════════════════════════════════════════ */
     .tabs {
-      display:flex; gap:2px; padding:0 2px;
-      border-bottom:1px solid var(--border); background:var(--surface);
+      display: flex; gap: 1px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
     }
     .tab-btn {
-      flex:1; padding:9px 3px 8px; background:transparent; border:none;
-      border-bottom:2px solid transparent; color:var(--text-muted);
-      font-family:var(--font); font-size:10.5px; font-weight:600;
-      cursor:pointer; transition:all 0.2s; letter-spacing:0.2px;
-      display:flex; align-items:center; justify-content:center; gap:3px;
+      flex: 1; padding: 8px 2px 7px; background: transparent; border: none;
+      border-bottom: 2px solid transparent; color: var(--text-muted);
+      font-family: var(--font); font-size: 10px; font-weight: 600;
+      cursor: pointer; transition: all 0.18s; letter-spacing: 0.2px;
+      display: flex; align-items: center; justify-content: center; gap: 3px;
     }
-    .tab-btn:hover { color:var(--text); }
-    .tab-btn.active { color:var(--accent-2); border-bottom-color:var(--accent); }
-    .tab-icon { font-size:11px; }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--accent-2); border-bottom-color: var(--accent); }
+    .tab-icon { font-size: 11px; }
 
-    /* ── Panels ── */
-    .tab-panel { display:none; flex-direction:column; }
-    .tab-panel.active { display:flex; }
+    /* ═══════════════════════════════════════════════════════════
+       PANELS
+    ═══════════════════════════════════════════════════════════ */
+    .tab-panel { display: none; flex-direction: column; }
+    .tab-panel.active { display: flex; }
+    .form-wrap { padding: 13px 15px; display: flex; flex-direction: column; gap: 11px; }
 
-    /* ── Form ── */
-    .form-wrap {
-      padding:14px 16px; display:flex;
-      flex-direction:column; gap:12px;
+    /* ═══════════════════════════════════════════════════════════
+       FORM ELEMENTS
+    ═══════════════════════════════════════════════════════════ */
+    .field-group { display: flex; flex-direction: column; gap: 5px; }
+
+    label, .field-label {
+      font-size: 10px; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.7px;
+      display: flex; align-items: center; gap: 5px;
     }
-
-    /* ── Field Groups ── */
-    .field-group { display:flex; flex-direction:column; gap:5px; }
-    label {
-      font-size:10.5px; font-weight:700; color:var(--text-muted);
-      text-transform:uppercase; letter-spacing:0.7px;
-      display:flex; align-items:center; gap:5px;
-    }
-    .label-icon { font-size:12px; }
-    .required   { color:var(--red); font-size:9px; }
-    .hint       { font-size:10px; color:var(--text-dim); line-height:1.4; }
+    .label-icon { font-size: 11px; }
+    .required    { color: var(--red); font-size: 9px; }
+    .hint        { font-size: 10px; color: var(--text-dim); line-height: 1.5; }
 
     textarea, input[type="text"], input[type="email"], select {
-      width:100%; background:var(--surface-2); border:1px solid var(--border);
-      border-radius:var(--radius-sm); color:var(--text);
-      font-family:var(--font); font-size:12.5px;
-      padding:9px 11px; outline:none; resize:vertical;
-      transition:border-color 0.2s, box-shadow 0.2s;
+      width: 100%; background: var(--surface-2);
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      color: var(--text); font-family: var(--font); font-size: 12.5px;
+      padding: 8px 11px; outline: none; resize: vertical;
+      transition: border-color 0.18s, box-shadow 0.18s;
     }
     textarea:focus, input:focus, select:focus {
-      border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-glow);
+      border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow);
     }
-    textarea:disabled, input:disabled, select:disabled { opacity:0.45; cursor:not-allowed; }
-    #recipients { min-height:72px; }
-    #body       { min-height:90px; }
-    select { cursor:pointer; }
+    textarea:disabled, input:disabled, select:disabled { opacity: 0.4; cursor: not-allowed; }
+    #recipients { min-height: 68px; }
+    #body       { min-height: 88px; }
+    select { cursor: pointer; }
 
-    .recipients-header { display:flex; align-items:center; justify-content:space-between; }
+    /* ═══════════════════════════════════════════════════════════
+       CAMPAIGN NAME ROW
+    ═══════════════════════════════════════════════════════════ */
+    .campaign-row {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 7px 10px;
+    }
+    .campaign-icon { font-size: 13px; flex-shrink: 0; }
+    .campaign-input {
+      flex: 1; background: transparent; border: none;
+      color: var(--text); font-family: var(--font); font-size: 12px; outline: none;
+    }
+    .campaign-input::placeholder { color: var(--text-dim); }
+
+    /* ═══════════════════════════════════════════════════════════
+       RECIPIENTS AREA (compose tab)
+    ═══════════════════════════════════════════════════════════ */
+    .recipients-header { display: flex; align-items: center; justify-content: space-between; }
     #recipientBadge {
-      font-size:10px; font-weight:700;
-      background:var(--accent-glow); color:var(--accent-2);
-      border:1px solid rgba(124,92,252,0.35);
-      padding:2px 8px; border-radius:20px; display:none;
+      font-size: 9.5px; font-weight: 700;
+      background: var(--accent-glow); color: var(--accent-2);
+      border: 1px solid rgba(124,92,252,0.35);
+      padding: 2px 8px; border-radius: 20px; display: none;
     }
 
-    /* Campaign name field */
-    .campaign-name-row {
-      display:flex; align-items:center; gap:8px;
-      background:var(--surface-2); border:1px solid var(--border);
-      border-radius:var(--radius-sm); padding:8px 11px;
+    /* CSV-loaded source box */
+    #csvSourceBox {
+      display: none;
+      background: var(--green-bg); border: 1px solid rgba(34,197,94,0.25);
+      border-radius: var(--r-sm); padding: 10px 12px;
     }
-    .campaign-name-icon { font-size:14px; flex-shrink:0; }
-    .campaign-name-input {
-      flex:1; background:transparent; border:none;
-      color:var(--text); font-family:var(--font); font-size:12.5px;
-      outline:none; padding:0;
+    #csvSourceBox.visible { display: block; }
+    .csv-source-top {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 6px;
     }
-    .campaign-name-input::placeholder { color:var(--text-dim); }
+    .csv-source-title { font-size: 12px; font-weight: 700; color: var(--green); }
+    .csv-source-meta  { font-size: 10.5px; color: var(--text-muted); line-height: 1.5; }
+    .csv-field-chips  { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 
-    /* Chip row */
-    .chip-row { display:flex; flex-wrap:wrap; gap:5px; }
-    .chip {
-      font-size:10px; font-weight:600; font-family:monospace;
-      background:var(--surface-3); border:1px solid var(--border-light);
-      color:var(--accent-2); padding:2px 8px; border-radius:4px;
-      cursor:pointer; transition:background 0.15s;
+    /* Email-only mode banner */
+    #emailModeBanner {
+      display: none;
+      background: var(--blue-bg); border: 1px solid rgba(96,165,250,0.25);
+      border-radius: var(--r-sm); padding: 10px 12px;
     }
-    .chip:hover { background:rgba(124,92,252,0.15); }
+    #emailModeBanner.visible { display: block; }
+    .mode-banner-title { font-size: 11.5px; font-weight: 700; color: var(--blue); margin-bottom: 5px; }
+    .mode-banner-body  { font-size: 10.5px; color: var(--text-muted); line-height: 1.5; }
 
-    /* Toggle row */
+    /* Extract-names toggle */
+    .extract-row {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 7px; padding-top: 7px;
+      border-top: 1px solid rgba(96,165,250,0.15);
+    }
+    .extract-label { font-size: 11px; color: var(--text-muted); flex: 1; cursor: pointer; }
+    .extract-badge {
+      font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 10px;
+      background: var(--amber-bg); color: var(--amber);
+      border: 1px solid rgba(245,158,11,0.3);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       DYNAMIC MERGE FIELD CHIPS
+    ═══════════════════════════════════════════════════════════ */
+    .chips-wrap {
+      display: flex; flex-wrap: wrap; gap: 5px;
+      min-height: 22px; align-items: center;
+    }
+    .merge-chip {
+      font-family: var(--mono); font-size: 10px; font-weight: 600;
+      padding: 3px 9px; border-radius: var(--r-xs);
+      cursor: pointer; transition: all 0.15s; user-select: none;
+      border: 1px solid;
+    }
+    .merge-chip.available {
+      background: rgba(124,92,252,0.12); color: var(--accent-2);
+      border-color: rgba(124,92,252,0.35);
+    }
+    .merge-chip.available:hover { background: rgba(124,92,252,0.22); }
+    .merge-chip.estimated {
+      background: var(--amber-bg); color: var(--amber);
+      border-color: rgba(245,158,11,0.35);
+    }
+    .merge-chip.unavailable {
+      background: transparent; color: var(--text-dim);
+      border-color: var(--border); cursor: not-allowed;
+      text-decoration: line-through; opacity: 0.5;
+    }
+    .chips-empty { font-size: 10.5px; color: var(--text-dim); }
+
+    /* ═══════════════════════════════════════════════════════════
+       SUBJECT / BODY
+    ═══════════════════════════════════════════════════════════ */
+    .field-footer { display: flex; justify-content: space-between; align-items: center; }
+    #charCount    { font-size: 10px; color: var(--text-dim); }
+
+    /* ═══════════════════════════════════════════════════════════
+       PREVIEW PANEL (redesigned with dropdown)
+    ═══════════════════════════════════════════════════════════ */
+    #previewPanel {
+      display: none; flex-direction: column; gap: 8px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 10px 12px;
+    }
+    #previewPanel.visible { display: flex; }
+
+    .preview-toolbar {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .preview-label-txt { font-size: 10.5px; font-weight: 700; color: var(--text-muted); flex-shrink: 0; }
+    #previewSelect {
+      flex: 1; min-height: unset; font-size: 11px;
+      padding: 5px 8px; background: var(--surface-3);
+    }
+    .preview-counter { font-size: 10px; color: var(--text-dim); white-space: nowrap; }
+
+    .preview-field-label {
+      font-size: 9.5px; font-weight: 700; color: var(--text-dim);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;
+    }
+    .preview-value {
+      background: var(--surface-3); border: 1px solid var(--border);
+      border-radius: var(--r-xs); padding: 6px 9px;
+      font-size: 11.5px; line-height: 1.55; word-break: break-word;
+      max-height: 72px; overflow-y: auto;
+    }
+    /* Variable highlighting in preview */
+    .var-resolved   { background: rgba(34,197,94,0.15); color: #86efac; border-radius: 3px; padding: 1px 4px; font-family: var(--mono); font-size: 10.5px; }
+    .var-unresolved { background: rgba(244,63,94,0.15); color: #fda4af; border-radius: 3px; padding: 1px 4px; font-family: var(--mono); font-size: 10.5px; }
+    .var-chip       { color: var(--accent-2); font-family: var(--mono); font-size: 10.5px; }
+
+    /* ═══════════════════════════════════════════════════════════
+       VALIDATION PANEL
+    ═══════════════════════════════════════════════════════════ */
+    #validationPanel { display: flex; flex-direction: column; gap: 5px; }
+    .v-item {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 9px 11px; border-radius: var(--r-sm);
+      font-size: 11.5px; line-height: 1.5; border: 1px solid;
+      animation: fadeIn 0.2s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    .v-item.error   { background: var(--red-bg);   border-color: rgba(244,63,94,0.3);   color: #fda4af; }
+    .v-item.warning { background: var(--amber-bg); border-color: rgba(245,158,11,0.3);  color: #fde68a; }
+    .v-icon { font-size: 13px; flex-shrink: 0; margin-top: 1px; }
+    .v-body { flex: 1; }
+    .v-msg  { font-weight: 600; }
+    .v-hint { font-size: 10.5px; opacity: 0.8; margin-top: 2px; }
+
+    /* ═══════════════════════════════════════════════════════════
+       SEND ALL TOGGLE
+    ═══════════════════════════════════════════════════════════ */
     .toggle-row {
-      display:flex; align-items:center; justify-content:space-between;
-      background:var(--surface-2); border:1px solid var(--border);
-      border-radius:var(--radius-sm); padding:9px 12px;
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 8px 11px;
     }
-    .toggle-label { font-size:12px; font-weight:500; display:flex; align-items:center; gap:8px; }
-    .toggle-sub   { font-size:10px; color:var(--text-muted); margin-top:2px; }
-    .toggle-wrap  { flex-shrink:0; }
-    .toggle { position:relative; display:inline-block; width:36px; height:20px; }
-    .toggle input { opacity:0; width:0; height:0; }
+    .toggle-label { font-size: 11.5px; font-weight: 500; }
+    .toggle-sub   { font-size: 9.5px; color: var(--text-muted); margin-top: 2px; }
+    .toggle { position: relative; display: inline-block; width: 34px; height: 19px; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
     .slider {
-      position:absolute; cursor:pointer; inset:0;
-      background:var(--surface-3); border:1px solid var(--border-light);
-      border-radius:20px; transition:background 0.25s;
+      position: absolute; cursor: pointer; inset: 0;
+      background: var(--surface-3); border: 1px solid var(--border-2);
+      border-radius: 19px; transition: background 0.22s;
     }
     .slider:before {
-      content:""; position:absolute;
-      height:14px; width:14px; left:2px; bottom:2px;
-      background:#fff; border-radius:50%; transition:transform 0.25s;
+      content: ""; position: absolute; height: 13px; width: 13px;
+      left: 2px; bottom: 2px; background: #fff; border-radius: 50%;
+      transition: transform 0.22s;
     }
-    .toggle input:checked + .slider { background:var(--accent); border-color:var(--accent); }
-    .toggle input:checked + .slider:before { transform:translateX(16px); }
+    .toggle input:checked + .slider { background: var(--accent); border-color: var(--accent); }
+    .toggle input:checked + .slider:before { transform: translateX(15px); }
 
-    .divider { height:1px; background:var(--border); margin:0 -16px; }
-
-    .field-footer { display:flex; justify-content:space-between; align-items:center; }
-    #charCount    { font-size:10px; color:var(--text-dim); }
-
-    /* Buttons */
-    #startBtn, .secondary-btn, .small-btn, .reports-btn {
-      font-family:var(--font); font-weight:700; border:none; cursor:pointer; transition:all 0.2s;
-    }
-    #startBtn {
-      width:100%; padding:12px; border-radius:var(--radius);
-      background:linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
-      color:#fff; font-size:13.5px; letter-spacing:0.2px;
-      box-shadow:0 4px 20px var(--accent-glow);
-      position:relative; overflow:hidden;
-    }
-    #startBtn::after { content:""; position:absolute; inset:0; background:rgba(255,255,255,0); transition:background 0.2s; }
-    #startBtn:hover:not(:disabled)::after { background:rgba(255,255,255,0.08); }
-    #startBtn:active:not(:disabled)  { transform:scale(0.98); }
-    #startBtn:disabled { opacity:0.5; cursor:not-allowed; box-shadow:none; }
-
-    .secondary-btn {
-      background:var(--surface-2); border:1px solid var(--border);
-      color:var(--text); font-size:12px; border-radius:var(--radius-sm); padding:8px 14px;
-    }
-    .secondary-btn:hover { background:var(--surface-3); border-color:var(--border-light); }
-
-    .small-btn {
-      background:var(--accent-glow); border:1px solid rgba(124,92,252,0.3);
-      color:var(--accent-2); font-size:11px; border-radius:var(--radius-xs); padding:5px 10px;
-    }
-    .small-btn:hover { background:rgba(124,92,252,0.22); }
-
-    .reports-btn {
-      width:100%; padding:11px;
-      background:linear-gradient(135deg, #0f2454, #1a1435);
-      border:1px solid rgba(96,165,250,0.3);
-      color:var(--blue); font-size:12.5px; border-radius:var(--radius);
-      display:flex; align-items:center; justify-content:center; gap:8px;
-    }
-    .reports-btn:hover { border-color:var(--blue); background:var(--blue-dim); }
-
-    /* Progress bar */
+    /* ═══════════════════════════════════════════════════════════
+       DIVIDER & PROGRESS
+    ═══════════════════════════════════════════════════════════ */
+    .divider { height: 1px; background: var(--border); margin: 0 -15px; }
     #progressBar {
-      display:none; width:100%; height:5px;
-      background:var(--surface-2); border-radius:99px; overflow:hidden;
+      display: none; width: 100%; height: 5px;
+      background: var(--surface-2); border-radius: 99px; overflow: hidden;
     }
     #progressFill {
-      height:100%; width:0%;
-      background:linear-gradient(90deg, var(--accent), var(--accent-2));
-      border-radius:99px; transition:width 0.5s ease;
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      border-radius: 99px; transition: width 0.45s ease;
     }
 
-    /* Status box */
+    /* ═══════════════════════════════════════════════════════════
+       STATUS BOX
+    ═══════════════════════════════════════════════════════════ */
     .status-box {
-      display:none; align-items:flex-start; gap:9px;
-      padding:11px 13px; border-radius:var(--radius-sm);
-      border:1px solid transparent; font-size:12px; line-height:1.5;
-      animation:fadeSlideIn 0.25s ease;
+      display: none; align-items: flex-start; gap: 8px;
+      padding: 10px 12px; border-radius: var(--r-sm);
+      border: 1px solid transparent; font-size: 11.5px; line-height: 1.5;
     }
-    @keyframes fadeSlideIn {
-      from { opacity:0; transform:translateY(6px); }
-      to   { opacity:1; transform:translateY(0); }
-    }
-    .status-box.running { background:rgba(124,92,252,0.1); border-color:rgba(124,92,252,0.3); color:#c4b5fd; }
-    .status-box.success { background:var(--green-dim);   border-color:rgba(34,197,94,0.3);   color:#86efac; }
-    .status-box.error   { background:var(--red-dim);     border-color:rgba(244,63,94,0.3);   color:#fda4af; }
-    .status-box.idle    { background:rgba(255,255,255,0.03); border-color:var(--border); color:var(--text-muted); }
-    #statusIcon { font-size:15px; flex-shrink:0; margin-top:1px; }
-    #statusText { flex:1; }
+    .status-box.running { background: rgba(124,92,252,0.1); border-color: rgba(124,92,252,0.3); color: #c4b5fd; }
+    .status-box.success { background: var(--green-bg); border-color: rgba(34,197,94,0.3); color: #86efac; }
+    .status-box.error   { background: var(--red-bg);   border-color: rgba(244,63,94,0.3); color: #fda4af; }
+    .status-box.idle    { background: rgba(255,255,255,0.03); border-color: var(--border); color: var(--text-muted); }
+    #statusIcon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
 
-    /* Preview panel */
-    #previewPanel {
-      display:none; flex-direction:column; gap:6px;
-      background:var(--surface-2); border:1px solid var(--border);
-      border-radius:var(--radius-sm); padding:11px 12px;
+    /* ═══════════════════════════════════════════════════════════
+       BUTTONS
+    ═══════════════════════════════════════════════════════════ */
+    #startBtn {
+      width: 100%; padding: 12px; border-radius: var(--r);
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border: none; color: #fff; font-family: var(--font);
+      font-size: 13px; font-weight: 700; letter-spacing: 0.2px;
+      cursor: pointer; transition: all 0.18s;
+      box-shadow: 0 4px 18px var(--accent-glow);
+      position: relative; overflow: hidden;
     }
-    #previewPanel.visible { display:flex; }
-    .preview-header { display:flex; align-items:center; justify-content:space-between; }
-    .preview-title  { font-size:10.5px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.6px; }
-    .preview-nav    { display:flex; align-items:center; gap:6px; }
-    .preview-nav button {
-      width:22px; height:22px; border-radius:4px;
-      background:var(--surface-3); border:1px solid var(--border);
-      color:var(--text); font-size:12px; cursor:pointer;
-      display:flex; align-items:center; justify-content:center; transition:background 0.15s;
-    }
-    .preview-nav button:hover { background:var(--border-light); }
-    #previewIndex { font-size:10px; color:var(--text-muted); white-space:nowrap; }
-    .preview-field { font-size:11.5px; line-height:1.5; }
-    .preview-label { color:var(--text-muted); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px; }
-    .preview-value {
-      background:var(--surface-3); border:1px solid var(--border);
-      border-radius:4px; padding:5px 8px; color:var(--text);
-      white-space:pre-wrap; word-break:break-word; max-height:60px;
-      overflow-y:auto; font-size:11.5px;
-    }
-    .preview-value .highlight { color:var(--accent-2); font-weight:600; }
+    #startBtn::after { content: ""; position: absolute; inset: 0; background: rgba(255,255,255,0); transition: background 0.18s; }
+    #startBtn:hover:not(:disabled)::after { background: rgba(255,255,255,0.08); }
+    #startBtn:active:not(:disabled) { transform: scale(0.98); }
+    #startBtn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
 
-    /* CSV Tab */
+    .sec-btn, .sm-btn, .reports-btn {
+      font-family: var(--font); font-weight: 700; border: none; cursor: pointer; transition: all 0.18s;
+    }
+    .sec-btn {
+      background: var(--surface-2); border: 1px solid var(--border);
+      color: var(--text); font-size: 11.5px; border-radius: var(--r-sm); padding: 7px 13px;
+    }
+    .sec-btn:hover { background: var(--surface-3); border-color: var(--border-2); }
+    .sm-btn {
+      background: var(--accent-glow); border: 1px solid rgba(124,92,252,0.3);
+      color: var(--accent-2); font-size: 10.5px; border-radius: var(--r-xs); padding: 4px 9px;
+    }
+    .sm-btn:hover { background: rgba(124,92,252,0.22); }
+    .danger-btn {
+      background: var(--red-bg); border: 1px solid rgba(244,63,94,0.3);
+      color: var(--red); font-size: 10.5px; border-radius: var(--r-xs); padding: 4px 9px;
+      font-family: var(--font); font-weight: 700; cursor: pointer;
+    }
+    .danger-btn:hover { background: rgba(244,63,94,0.15); }
+    .reports-btn {
+      width: 100%; padding: 10px;
+      background: linear-gradient(135deg, #0f2454, #1a1435);
+      border: 1px solid rgba(96,165,250,0.3);
+      color: var(--blue); font-size: 12px; border-radius: var(--r);
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+    }
+    .reports-btn:hover { border-color: var(--blue); background: var(--blue-bg); }
+
+    /* ═══════════════════════════════════════════════════════════
+       CSV TAB — DROP ZONE
+    ═══════════════════════════════════════════════════════════ */
     .csv-drop-zone {
-      border:2px dashed var(--border); border-radius:var(--radius);
-      padding:24px 20px; text-align:center; cursor:pointer;
-      transition:all 0.2s; background:var(--surface-2);
+      border: 2px dashed var(--border); border-radius: var(--r);
+      padding: 22px 18px; text-align: center; cursor: pointer;
+      background: var(--surface-2); transition: all 0.18s;
     }
-    .csv-drop-zone:hover, .csv-drop-zone.drag-over { border-color:var(--accent); background:rgba(124,92,252,0.06); }
-    .csv-drop-icon  { font-size:26px; margin-bottom:8px; }
-    .csv-drop-title { font-size:13px; font-weight:600; color:var(--text); margin-bottom:4px; }
-    .csv-drop-sub   { font-size:11px; color:var(--text-muted); }
-    #csvFileInput   { display:none; }
-    .csv-table-wrap { display:none; flex-direction:column; gap:8px; }
-    .csv-table-wrap.visible { display:flex; }
-    .csv-table-header { display:flex; align-items:center; justify-content:space-between; }
-    .csv-info { font-size:11px; color:var(--text-muted); }
-    .csv-table {
-      width:100%; border-collapse:collapse; font-size:11px;
-      border-radius:var(--radius-sm); overflow:hidden; border:1px solid var(--border);
+    .csv-drop-zone:hover, .csv-drop-zone.drag-over { border-color: var(--accent); background: rgba(124,92,252,0.05); }
+    .drop-icon  { font-size: 26px; margin-bottom: 7px; }
+    .drop-title { font-size: 12.5px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+    .drop-sub   { font-size: 10.5px; color: var(--text-muted); }
+    #csvFileInput { display: none; }
+
+    /* CSV file info bar */
+    #csvFileInfo {
+      display: none;
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 9px 12px;
     }
-    .csv-table th { background:var(--surface-3); color:var(--text-muted); padding:6px 9px; text-align:left; font-weight:600; font-size:10px; text-transform:uppercase; letter-spacing:0.4px; border-bottom:1px solid var(--border); }
-    .csv-table td { padding:5px 9px; border-bottom:1px solid var(--border); color:var(--text); max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .csv-table tr:last-child td { border-bottom:none; }
-    .column-map { display:flex; flex-direction:column; gap:6px; }
-    .column-map-row { display:flex; align-items:center; gap:8px; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-xs); padding:7px 10px; }
-    .column-map-label { font-size:11px; color:var(--text-muted); font-weight:600; flex:1; }
-    .column-map select { flex:1.2; padding:4px 7px; font-size:11px; min-height:unset; }
+    #csvFileInfo.visible { display: flex; align-items: center; gap: 10px; }
+    .file-icon  { font-size: 18px; flex-shrink: 0; }
+    .file-name  { font-size: 12.5px; font-weight: 700; color: var(--text); }
+    .file-stats { font-size: 10.5px; color: var(--text-muted); margin-top: 2px; }
+    .file-info-spacer { flex: 1; }
 
-    /* Selector Tester */
-    .selector-grid { display:grid; grid-template-columns:1fr; gap:8px; }
-    .selector-item { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm); overflow:hidden; }
-    .selector-item-head { display:flex; align-items:center; gap:8px; padding:8px 11px; border-bottom:1px solid var(--border); background:var(--surface-3); }
-    .selector-name { font-size:11px; font-weight:700; flex:1; }
-    .selector-status-dot { width:8px; height:8px; border-radius:50%; background:var(--text-dim); flex-shrink:0; transition:background 0.3s; }
-    .selector-status-dot.found   { background:var(--green); box-shadow:0 0 5px rgba(34,197,94,0.5); }
-    .selector-status-dot.missing { background:var(--red);   box-shadow:0 0 5px rgba(244,63,94,0.5); }
-    .selector-item-body { padding:8px 11px; display:flex; flex-direction:column; gap:5px; }
-    .selector-field { display:flex; flex-direction:column; gap:3px; }
-    .selector-field-label { font-size:9.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.4px; }
-    .selector-field-result { font-size:10px; }
-    .selector-field-result.ok  { color:var(--green); }
-    .selector-field-result.err { color:var(--red); }
-    .test-all-btn-wrap { display:flex; justify-content:flex-end; gap:8px; }
+    /* ═══════════════════════════════════════════════════════════
+       CSV TAB — COLUMN MAPPING TABLE
+    ═══════════════════════════════════════════════════════════ */
+    #mappingSection { display: none; flex-direction: column; gap: 10px; }
+    #mappingSection.visible { display: flex; }
 
-    /* Campaign History Tab */
-    .camp-history-wrap { display:flex; flex-direction:column; gap:8px; }
+    .mapping-table-wrap {
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--r-sm); overflow: hidden;
+    }
+    .mapping-table { width: 100%; border-collapse: collapse; }
+    .mapping-table thead th {
+      background: var(--surface-3); padding: 7px 10px;
+      font-size: 9.5px; font-weight: 700; color: var(--text-muted);
+      text-align: left; text-transform: uppercase; letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+    }
+    .mapping-table tbody tr { border-bottom: 1px solid var(--border); transition: background 0.12s; }
+    .mapping-table tbody tr:last-child { border-bottom: none; }
+    .mapping-table tbody tr:hover { background: var(--surface-3); }
+    .mapping-table td { padding: 7px 10px; vertical-align: middle; }
+
+    .map-status { font-size: 14px; width: 22px; text-align: center; }
+    .map-header { font-family: var(--mono); font-size: 11px; color: var(--text); font-weight: 600; }
+    .map-select {
+      width: 100%; background: var(--surface-3); border: 1px solid var(--border);
+      border-radius: var(--r-xs); color: var(--text); font-size: 11px; font-family: var(--font);
+      padding: 4px 7px; cursor: pointer; outline: none; transition: border-color 0.15s;
+    }
+    .map-select:focus { border-color: var(--accent); }
+    .map-key {
+      font-family: var(--mono); font-size: 9.5px; color: var(--accent-2);
+      background: rgba(124,92,252,0.1); border: 1px solid rgba(124,92,252,0.25);
+      padding: 2px 7px; border-radius: 4px; white-space: nowrap;
+    }
+    .map-key.ignored { color: var(--text-dim); background: transparent; border-color: var(--border); }
+
+    /* Mapped fields summary */
+    .mapping-summary {
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 10px 12px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .summary-row { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+    .summary-label { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; width: 100%; margin-bottom: 2px; }
+    .summary-chip {
+      font-family: var(--mono); font-size: 9.5px; font-weight: 600;
+      padding: 2px 8px; border-radius: 4px; border: 1px solid;
+    }
+    .summary-chip.standard { color: var(--green); background: var(--green-bg); border-color: rgba(34,197,94,0.3); }
+    .summary-chip.custom   { color: var(--accent-2); background: rgba(124,92,252,0.1); border-color: rgba(124,92,252,0.3); }
+
+    /* CSV action row */
+    .csv-actions { display: flex; gap: 8px; }
+    .csv-actions .sec-btn { flex: 1; font-size: 11px; }
+
+    /* ═══════════════════════════════════════════════════════════
+       CAMPAIGNS TAB
+    ═══════════════════════════════════════════════════════════ */
+    .camp-quick-stats {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px;
+    }
+    .qstat {
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 9px 11px; text-align: center;
+    }
+    .qstat-val { font-size: 19px; font-weight: 800; line-height: 1; }
+    .qstat-label { font-size: 9.5px; color: var(--text-muted); margin-top: 3px; }
+
     .camp-card {
-      background:var(--surface-2); border:1px solid var(--border);
-      border-radius:var(--radius-sm); padding:10px 12px;
-      cursor:default; transition:border-color 0.2s;
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 9px 11px; transition: border-color 0.15s;
     }
-    .camp-card:hover { border-color:var(--border-light); }
-    .camp-card-top { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
-    .camp-card-name { font-size:12.5px; font-weight:700; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .camp-card:hover { border-color: var(--border-2); }
+    .camp-card-top  { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+    .camp-card-name { font-size: 12px; font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .camp-pill {
-      font-size:9.5px; font-weight:700; padding:2px 7px; border-radius:20px;
-      flex-shrink:0;
+      font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 20px; flex-shrink: 0;
     }
-    .camp-pill.completed { background:var(--green-dim);  color:var(--green);  border:1px solid rgba(34,197,94,0.3); }
-    .camp-pill.partial   { background:var(--amber-dim);  color:var(--amber);  border:1px solid rgba(245,158,11,0.3); }
-    .camp-pill.failed    { background:var(--red-dim);    color:var(--red);    border:1px solid rgba(244,63,94,0.3); }
-    .camp-pill.running   { background:var(--blue-dim);   color:var(--blue);   border:1px solid rgba(96,165,250,0.3); }
-    .camp-card-meta { display:flex; align-items:center; gap:10px; font-size:10.5px; color:var(--text-muted); }
-    .camp-mini-bar { flex:1; height:4px; background:var(--surface-3); border-radius:99px; overflow:hidden; }
-    .camp-mini-fill { height:100%; background:linear-gradient(90deg, var(--green), #86efac); border-radius:99px; }
+    .camp-pill.completed { background: var(--green-bg); color: var(--green); border: 1px solid rgba(34,197,94,0.3); }
+    .camp-pill.partial   { background: var(--amber-bg); color: var(--amber); border: 1px solid rgba(245,158,11,0.3); }
+    .camp-pill.failed    { background: var(--red-bg);   color: var(--red);   border: 1px solid rgba(244,63,94,0.3); }
+    .camp-pill.running   { background: var(--blue-bg);  color: var(--blue);  border: 1px solid rgba(96,165,250,0.3); }
+    .camp-meta { display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--text-muted); }
+    .camp-mini-bar { flex: 1; height: 3px; background: var(--surface-3); border-radius: 99px; overflow: hidden; }
+    .camp-mini-fill { height: 100%; background: linear-gradient(90deg, var(--green), #86efac); border-radius: 99px; }
+    .camp-empty { text-align: center; padding: 24px; color: var(--text-dim); font-size: 11.5px; }
 
-    .camp-empty { text-align:center; padding:28px 16px; color:var(--text-dim); font-size:12px; }
+    /* ═══════════════════════════════════════════════════════════
+       SELECTOR TESTER TAB
+    ═══════════════════════════════════════════════════════════ */
+    .sel-grid { display: flex; flex-direction: column; gap: 7px; }
+    .sel-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; }
+    .sel-card-head { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: var(--surface-3); border-bottom: 1px solid var(--border); }
+    .sel-name { font-size: 11px; font-weight: 700; flex: 1; }
+    .sel-dot  { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; transition: all 0.3s; }
+    .sel-dot.found   { background: var(--green); box-shadow: 0 0 5px rgba(34,197,94,0.5); }
+    .sel-dot.missing { background: var(--red);   box-shadow: 0 0 5px rgba(244,63,94,0.5); }
+    .sel-card-body { padding: 7px 10px; display: flex; flex-direction: column; gap: 4px; }
+    .sel-field-row { display: flex; align-items: center; gap: 6px; font-size: 10.5px; }
+    .sel-field-name { color: var(--text-muted); width: 90px; flex-shrink: 0; }
+    .sel-result { }
+    .sel-result.ok  { color: var(--green); }
+    .sel-result.err { color: var(--red); }
 
-    /* Footer */
+    /* ═══════════════════════════════════════════════════════════
+       FOOTER
+    ═══════════════════════════════════════════════════════════ */
     .footer {
-      padding:9px 16px 12px; text-align:center;
-      font-size:10px; color:var(--text-dim);
-      border-top:1px solid var(--border); flex-shrink:0;
+      padding: 8px 15px 11px; text-align: center;
+      font-size: 9.5px; color: var(--text-dim);
+      border-top: 1px solid var(--border); flex-shrink: 0;
     }
   </style>
 </head>
@@ -373,7 +547,7 @@
     <div class="logo">✉️</div>
     <div class="header-text">
       <h1>Universal Mail Merger</h1>
-      <p>Personalized drafts across all webmail providers</p>
+      <p>True one-to-one personalized emails · CSV-powered</p>
     </div>
   </div>
   <div class="badge-row">
@@ -385,105 +559,119 @@
 
 <!-- Tabs -->
 <div class="tabs" role="tablist">
-  <button class="tab-btn active" data-tab="compose"  role="tab"><span class="tab-icon">✍️</span> Compose</button>
-  <button class="tab-btn"        data-tab="csv"      role="tab"><span class="tab-icon">📋</span> CSV</button>
-  <button class="tab-btn"        data-tab="campaigns"role="tab"><span class="tab-icon">📁</span> Campaigns</button>
-  <button class="tab-btn"        data-tab="tester"   role="tab"><span class="tab-icon">🔍</span> Tester</button>
+  <button class="tab-btn active" data-tab="compose"   role="tab"><span class="tab-icon">✍️</span> Compose</button>
+  <button class="tab-btn"        data-tab="csv"        role="tab"><span class="tab-icon">📋</span> CSV</button>
+  <button class="tab-btn"        data-tab="campaigns"  role="tab"><span class="tab-icon">📁</span> Campaigns</button>
+  <button class="tab-btn"        data-tab="tester"     role="tab"><span class="tab-icon">🔍</span> Tester</button>
 </div>
 
-<!-- ════════════════ COMPOSE TAB ════════════════ -->
+<!-- ══════════════════════ COMPOSE ══════════════════════ -->
 <div class="tab-panel active" id="panel-compose" role="tabpanel">
   <div class="form-wrap">
 
     <!-- Campaign Name -->
-    <div class="campaign-name-row">
-      <span class="campaign-name-icon">📁</span>
-      <input class="campaign-name-input" type="text" id="campaignName"
-        placeholder="Campaign name (auto-filled)" autocomplete="off" spellcheck="false" />
+    <div class="campaign-row">
+      <span class="campaign-icon">📁</span>
+      <input class="campaign-input" type="text" id="campaignName" placeholder="Campaign name (auto-filled)" autocomplete="off" />
     </div>
 
-    <!-- Recipients -->
+    <!-- Recipients / CSV Source -->
     <div class="field-group">
       <div class="recipients-header">
-        <label for="recipients">
-          <span class="label-icon">👥</span> Recipients <span class="required">*</span>
-        </label>
-        <span id="recipientBadge">0 recipients</span>
+        <label for="recipients"><span class="label-icon">👥</span> Recipients <span class="required">*</span></label>
+        <span id="recipientBadge"></span>
       </div>
-      <p class="hint">One email per line or comma-separated. Use CSV tab for merge fields.</p>
+
+      <!-- CSV source summary (shown when CSV is loaded) -->
+      <div id="csvSourceBox">
+        <div class="csv-source-top">
+          <span class="csv-source-title" id="csvSourceTitle">📋 0 recipients from CSV</span>
+          <button class="danger-btn" id="clearCsvBtn" type="button">✕ Clear</button>
+        </div>
+        <div class="csv-source-meta" id="csvSourceMeta"></div>
+        <div class="csv-field-chips" id="csvFieldChips"></div>
+      </div>
+
+      <!-- Manual email input (shown in email-only mode) -->
       <textarea id="recipients"
-        placeholder="alice@example.com&#10;bob@example.com&#10;carol@example.com"
+        placeholder="john@gmail.com&#10;alice@example.com&#10;bob@company.com"
         spellcheck="false" autocomplete="off"></textarea>
+
+      <!-- Email-only mode banner -->
+      <div id="emailModeBanner">
+        <div class="mode-banner-title">ℹ️ Email-only mode — limited personalization</div>
+        <div class="mode-banner-body">Only <code style="color:var(--accent-2);font-size:10px">{{email}}</code> is reliably available. Variables like <code style="color:var(--red);font-size:10px">{{name}}</code>, <code style="color:var(--red);font-size:10px">{{company}}</code> require a CSV upload.</div>
+        <div class="extract-row">
+          <input type="checkbox" id="extractNamesCheck" checked />
+          <label class="extract-label" for="extractNamesCheck">
+            Auto-extract name from email address &nbsp;<span class="extract-badge">Estimated</span>
+          </label>
+        </div>
+      </div>
     </div>
 
     <!-- Subject -->
     <div class="field-group">
-      <label for="subject">
-        <span class="label-icon">📌</span> Subject <span class="required">*</span>
-      </label>
-      <input type="text" id="subject" placeholder="Hello {{name}}, here's your update…"
-        autocomplete="off" spellcheck="false" />
+      <label for="subject"><span class="label-icon">📌</span> Subject <span class="required">*</span></label>
+      <input type="text" id="subject" placeholder="Hi {{name}}, a quick note…" autocomplete="off" spellcheck="false" />
     </div>
 
-    <!-- Body -->
+    <!-- Body with dynamic chips -->
     <div class="field-group">
-      <label for="body">
-        <span class="label-icon">📝</span> Message Body <span class="required">*</span>
-      </label>
-      <p class="hint">Use <code style="font-size:10px;color:var(--accent-2)">{{variable}}</code> merge fields — click chips to insert.</p>
-      <div class="chip-row" id="mergeChips">
-        <span class="chip" data-var="name">{{name}}</span>
-        <span class="chip" data-var="company">{{company}}</span>
-        <span class="chip" data-var="email">{{email}}</span>
-        <span class="chip" data-var="role">{{role}}</span>
+      <label for="body"><span class="label-icon">📝</span> Message Body <span class="required">*</span></label>
+      <div class="chips-wrap" id="chipsWrap">
+        <span class="chips-empty">Upload a CSV to generate merge fields</span>
       </div>
       <textarea id="body"
-        placeholder="Hi {{name}},&#10;&#10;I wanted to reach out to you at {{company}}…&#10;&#10;Best regards"
+        placeholder="Hi {{name}},&#10;&#10;I wanted to reach out regarding your role as {{role}} at {{company}}.&#10;&#10;Best regards"
         spellcheck="true"></textarea>
       <div class="field-footer">
         <span id="charCount">0 chars</span>
-        <button class="small-btn" id="previewBtn" type="button">👁 Preview</button>
+        <button class="sm-btn" id="previewBtn" type="button">👁 Preview</button>
       </div>
     </div>
 
     <!-- Preview Panel -->
     <div id="previewPanel">
-      <div class="preview-header">
-        <span class="preview-title">📧 Draft Preview</span>
-        <div class="preview-nav">
-          <button id="prevPreview" type="button">‹</button>
-          <span id="previewIndex">1 / 1</span>
-          <button id="nextPreview" type="button">›</button>
-        </div>
+      <div class="preview-toolbar">
+        <span class="preview-label-txt">Preview as:</span>
+        <select id="previewSelect"><option value="-1">— select recipient —</option></select>
+        <span class="preview-counter" id="previewCounter"></span>
       </div>
-      <div class="preview-field"><div class="preview-label">To</div><div class="preview-value" id="previewTo"></div></div>
-      <div class="preview-field"><div class="preview-label">Subject</div><div class="preview-value" id="previewSubject"></div></div>
-      <div class="preview-field"><div class="preview-label">Body</div><div class="preview-value" id="previewBody"></div></div>
+      <div>
+        <div class="preview-field-label">Subject</div>
+        <div class="preview-value" id="previewSubjectEl"></div>
+      </div>
+      <div>
+        <div class="preview-field-label">Body</div>
+        <div class="preview-value" id="previewBodyEl"></div>
+      </div>
     </div>
+
+    <!-- Validation Panel -->
+    <div id="validationPanel"></div>
 
     <!-- Send All Toggle -->
     <div class="toggle-row">
       <div>
         <div class="toggle-label">⚡ Send All Automatically</div>
-        <div class="toggle-sub">⚠️ Emails will be sent immediately. Cannot be undone.</div>
+        <div class="toggle-sub">⚠️ Emails sent immediately — cannot be undone.</div>
       </div>
-      <div class="toggle-wrap">
-        <label class="toggle" title="Toggle auto-send mode">
-          <input type="checkbox" id="sendAllToggle" />
-          <span class="slider"></span>
-        </label>
-      </div>
+      <label class="toggle">
+        <input type="checkbox" id="sendAllToggle" />
+        <span class="slider"></span>
+      </label>
     </div>
 
     <div class="divider"></div>
 
-    <!-- Progress + Status -->
     <div id="progressBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
       <div id="progressFill"></div>
     </div>
+
     <div id="statusBox" class="status-box idle" role="status" aria-live="polite">
       <span id="statusIcon">ℹ️</span>
-      <span id="statusText">Ready. Fill in the fields above and click Start.</span>
+      <span id="statusText">Ready. Upload a CSV or enter emails, then fill in the template.</span>
     </div>
 
     <button id="startBtn" type="button">🚀 Start Mail Merge</button>
@@ -491,87 +679,103 @@
   </div>
 </div>
 
-<!-- ════════════════ CSV TAB ════════════════ -->
+<!-- ══════════════════════ CSV TAB ══════════════════════ -->
 <div class="tab-panel" id="panel-csv" role="tabpanel">
   <div class="form-wrap">
-    <div class="csv-drop-zone" id="csvDropZone" tabindex="0" role="button" aria-label="Upload CSV file">
-      <div class="csv-drop-icon">📂</div>
-      <div class="csv-drop-title">Drop a CSV file here</div>
-      <div class="csv-drop-sub">or click to browse &nbsp;·&nbsp; UTF-8 recommended</div>
+
+    <!-- Drop Zone -->
+    <div class="csv-drop-zone" id="csvDropZone" tabindex="0" role="button" aria-label="Upload CSV">
+      <div class="drop-icon">📂</div>
+      <div class="drop-title">Drop your CSV file here</div>
+      <div class="drop-sub">or click to browse &nbsp;·&nbsp; UTF-8 · Any columns</div>
     </div>
     <input type="file" id="csvFileInput" accept=".csv,text/csv" />
 
-    <div class="csv-table-wrap" id="csvTableWrap">
-      <div class="csv-table-header">
-        <span class="csv-info" id="csvInfo"></span>
-        <button class="small-btn" id="csvClearBtn" type="button">✕ Clear</button>
+    <!-- File info bar -->
+    <div id="csvFileInfo">
+      <span class="file-icon">📄</span>
+      <div>
+        <div class="file-name" id="csvFileName"></div>
+        <div class="file-stats" id="csvFileStats"></div>
       </div>
-      <div style="overflow-x:auto; border-radius:var(--radius-sm);">
-        <table class="csv-table" id="csvTable">
-          <thead id="csvThead"></thead>
-          <tbody id="csvTbody"></tbody>
-        </table>
-      </div>
+      <div class="file-info-spacer"></div>
+      <button class="danger-btn" id="csvRemoveBtn" type="button">✕ Remove</button>
+    </div>
+
+    <!-- Mapping Section (hidden until file loaded) -->
+    <div id="mappingSection">
+
+      <!-- Mapping table -->
       <div class="field-group">
-        <label><span class="label-icon">🗺️</span> Map Columns</label>
-        <div class="column-map" id="columnMap">
-          <div class="column-map-row"><span class="column-map-label">📧 Email column</span><select id="mapEmail"><option value="">— select —</option></select></div>
-          <div class="column-map-row"><span class="column-map-label">{{name}}</span><select id="mapName"><option value="">— none —</option></select></div>
-          <div class="column-map-row"><span class="column-map-label">{{company}}</span><select id="mapCompany"><option value="">— none —</option></select></div>
-          <div class="column-map-row"><span class="column-map-label">{{role}}</span><select id="mapRole"><option value="">— none —</option></select></div>
+        <label><span class="label-icon">🗺️</span> Column Mapping</label>
+        <p class="hint">Auto-detected fields are pre-filled. Adjust any mapping or set to Ignore.</p>
+        <div class="mapping-table-wrap">
+          <table class="mapping-table">
+            <thead>
+              <tr>
+                <th style="width:24px"></th>
+                <th>CSV Column</th>
+                <th>Maps To Field</th>
+                <th>Variable</th>
+              </tr>
+            </thead>
+            <tbody id="mappingTbody"></tbody>
+          </table>
         </div>
       </div>
-      <button class="secondary-btn" id="applyCSVBtn" type="button" style="width:100%">✅ Apply CSV Data to Compose</button>
+
+      <!-- Summary -->
+      <div class="mapping-summary" id="mappingSummary"></div>
+
+      <!-- Actions -->
+      <div class="csv-actions">
+        <button class="sec-btn" id="downloadSampleBtn" type="button">⬇ Sample CSV</button>
+        <button class="sec-btn" id="applyCsvBtn" type="button" style="flex:2;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;border:none">✅ Apply to Compose</button>
+      </div>
+
     </div>
+
+    <!-- Download sample (always visible when no file) -->
+    <button class="sec-btn" id="downloadSampleBtnEmpty" type="button" style="width:100%;display:none">⬇ Download Sample CSV</button>
+
   </div>
 </div>
 
-<!-- ════════════════ CAMPAIGNS TAB ════════════════ -->
+<!-- ══════════════════════ CAMPAIGNS TAB ══════════════════════ -->
 <div class="tab-panel" id="panel-campaigns" role="tabpanel">
   <div class="form-wrap">
 
-    <!-- Quick stats -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-      <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;text-align:center">
-        <div style="font-size:20px;font-weight:800;color:var(--accent-2)" id="qTotalCampaigns">—</div>
-        <div style="font-size:10px;color:var(--text-muted);margin-top:3px">Campaigns</div>
+    <div class="camp-quick-stats">
+      <div class="qstat">
+        <div class="qstat-val" id="qCampaigns" style="color:var(--accent-2)">—</div>
+        <div class="qstat-label">Campaigns</div>
       </div>
-      <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;text-align:center">
-        <div style="font-size:20px;font-weight:800;color:var(--green)" id="qTotalSuccess">—</div>
-        <div style="font-size:10px;color:var(--text-muted);margin-top:3px">Drafted</div>
+      <div class="qstat">
+        <div class="qstat-val" id="qDrafted" style="color:var(--green)">—</div>
+        <div class="qstat-label">Drafted</div>
       </div>
-      <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;text-align:center">
-        <div style="font-size:20px;font-weight:800;color:var(--amber)" id="qSuccessRate">—</div>
-        <div style="font-size:10px;color:var(--text-muted);margin-top:3px">Success Rate</div>
+      <div class="qstat">
+        <div class="qstat-val" id="qRate" style="color:var(--amber)">—</div>
+        <div class="qstat-label">Success</div>
       </div>
     </div>
 
-    <!-- Open Reports -->
-    <button class="reports-btn" id="openReportsBtn" type="button">
-      📊 Open Full Reports &amp; Analytics Dashboard
-    </button>
-
+    <button class="reports-btn" id="openReportsBtn" type="button">📊 Open Full Reports &amp; Analytics</button>
     <div class="divider"></div>
-
-    <!-- Recent Campaigns -->
-    <label style="margin-bottom:-4px"><span class="label-icon">🕑</span> Recent Campaigns</label>
-    <div class="camp-history-wrap" id="campHistoryList">
-      <div class="camp-empty">No campaigns yet. Run a merge to see history here.</div>
-    </div>
+    <label><span class="label-icon">🕑</span> Recent Campaigns</label>
+    <div id="campHistoryList"><div class="camp-empty">No campaigns yet — run a merge to see history.</div></div>
 
   </div>
 </div>
 
-<!-- ════════════════ SELECTOR TESTER TAB ════════════════ -->
+<!-- ══════════════════════ TESTER TAB ══════════════════════ -->
 <div class="tab-panel" id="panel-tester" role="tabpanel">
   <div class="form-wrap">
-    <p class="hint" style="font-size:11px;line-height:1.6;">
-      Runs each selector against the active webmail tab to confirm they find real elements. Use this when automation fails.
-    </p>
-    <div class="test-all-btn-wrap">
-      <button class="small-btn" id="testAllBtn" type="button">▶ Run All Tests</button>
+    <p class="hint" style="font-size:11px;line-height:1.6">Tests each CSS selector against the active webmail tab. Use this when automation stops working — find the broken selector and update <code style="color:var(--accent-2);font-size:10px">selectors.js</code>.</p>
+    <div style="display:flex;justify-content:flex-end">
+      <button class="sm-btn" id="testAllBtn" type="button">▶ Run All Tests</button>
     </div>
-    <div class="selector-grid" id="selectorGrid"></div>
+    <div class="sel-grid" id="selectorGrid"></div>
     <div id="testerStatus" class="status-box idle" style="display:none">
       <span id="testerIcon">ℹ️</span>
       <span id="testerText">Click "Run All Tests" to begin.</span>
@@ -581,9 +785,9 @@
 
 <!-- Footer -->
 <footer class="footer">
-  Drafts only — nothing sent without review &nbsp;|&nbsp; Universal Mail Merger v3
+  One unique email per recipient — never bulk. &nbsp;|&nbsp; Universal Mail Merger v3
 </footer>
 
-<script src="popup.js"></script>
+<script type="module" src="popup.js"></script>
 </body>
 </html>
