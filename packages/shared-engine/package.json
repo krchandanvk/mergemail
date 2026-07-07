@@ -1,0 +1,17 @@
+{
+  "name": "@mergemail/shared-engine",
+  "version": "1.0.0",
+  "description": "Shared template rendering, CSV parsing, column mapping and validation engine for Universal Mail Merger.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.2"
+  }
+}

@@ -2,14 +2,18 @@
   "name": "universal-mail-merger",
   "version": "3.0.0",
   "description": "True one-to-one mail merger Chrome extension with AI agent MCP, skills, and catalog discovery.",
-  "main": "background.js",
   "type": "commonjs",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "ai:discover": "ts-node src/discover.ts",
     "ai:mcp": "ts-node src/discover.ts --mcp",
     "ai:skills": "ts-node src/discover.ts --skills",
     "ai:catalog": "ts-node src/discover.ts --catalog",
     "ai:validate": "jest",
+    "sync:extension": "node scripts/sync-extension.js",
     "start": "ts-node src/server.ts",
     "test": "jest"
   },

@@ -24,7 +24,7 @@ interface ProviderSelector {
 
 /** Parses providers and CSS selectors from selectors.js to keep metadata in sync. */
 function parseSelectors(): Record<string, ProviderSelector> {
-  const selectorsPath = path.join(__dirname, '../selectors.js');
+  const selectorsPath = path.join(__dirname, '../apps/extension/selectors.js');
   if (!fs.existsSync(selectorsPath)) return {};
 
   const content = fs.readFileSync(selectorsPath, 'utf-8');
